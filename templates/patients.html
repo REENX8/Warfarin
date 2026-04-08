@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}ผู้ป่วย{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">ผู้ป่วย</h1>
+            <p class="text-sm text-slate-500 mt-1">จัดการข้อมูลผู้ป่วยคลินิกวาร์ฟาริน</p>
+        </div>
+        <a href="/patients/new" class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            เพิ่มผู้ป่วย
+        </a>
+    </div>
+
+    <!-- Search -->
+    <form method="GET" action="/patients" class="max-w-md">
+        <div class="relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" name="q" value="{{ q }}" placeholder="ค้นหาชื่อ หรือ HN..." class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+    </form>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-slate-50">
+                    <tr class="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left">HN</th>
+                        <th class="px-6 py-3 text-left">ชื่อ-สกุล</th>
+                        <th class="px-6 py-3 text-center hidden sm:table-cell">อายุ</th>
+                        <th class="px-6 py-3 text-left hidden md:table-cell">โรค/วินิจฉัย</th>
+                        <th class="px-6 py-3 text-center">สถานะ</th>
+                        <th class="px-6 py-3 text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for p in patients %}
+                    <tr class="hover:bg-slate-50 transition-colors cursor-pointer" onclick="window.location='/patients/{{ p.patient_id }}'">
+                        <td class="px-6 py-3.5 text-sm text-slate-600">{{ p.hn or '-' }}</td>
+                        <td class="px-6 py-3.5">
+                            <span class="text-sm font-medium text-slate-700">{{ p.full_name }}</span>
+                        </td>
+                        <td class="px-6 py-3.5 text-center text-sm text-slate-600 hidden sm:table-cell">{{ p.age_years or '-' }}</td>
+                        <td class="px-6 py-3.5 text-sm text-slate-500 hidden md:table-cell">{{ p.diagnosis or p.chronic_conditions or '-' }}</td>
+                        <td class="px-6 py-3.5 text-center">
+                            {% if p.active %}
+                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Active</span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-3.5 text-center" onclick="event.stopPropagation()">
+                            <a href="/patients/{{ p.patient_id }}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium mr-3">ดู</a>
+                            <a href="/patients/{{ p.patient_id }}/edit" class="text-slate-500 hover:text-slate-700 text-sm font-medium">แก้ไข</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not patients %}
+                    <tr><td colspan="6" class="px-6 py-12 text-center text-sm text-slate-400">ไม่พบข้อมูลผู้ป่วย</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

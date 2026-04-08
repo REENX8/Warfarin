@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}รายงาน{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">รายงาน</h1>
+            <p class="text-sm text-slate-500 mt-1">สรุปความต่อเนื่องในการใช้ยาของผู้ป่วยทั้งหมด</p>
+        </div>
+        <a href="/reports/export" class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            ดาวน์โหลด CSV
+        </a>
+    </div>
+
+    <!-- Summary table -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-slate-50">
+                    <tr class="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left">HN</th>
+                        <th class="px-4 py-3 text-left">ชื่อ-สกุล</th>
+                        <th class="px-3 py-3 text-center">7 วัน</th>
+                        <th class="px-3 py-3 text-center">30 วัน</th>
+                        <th class="px-3 py-3 text-center hidden sm:table-cell">กิน</th>
+                        <th class="px-3 py-3 text-center hidden sm:table-cell">พลาด</th>
+                        <th class="px-3 py-3 text-center">Streak</th>
+                        <th class="px-3 py-3 text-center hidden md:table-cell">INR ล่าสุด</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for r in report_data %}
+                    <tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="window.location='/patients/{{ r.patient.patient_id }}'">
+                        <td class="px-4 py-3 text-sm text-slate-600">{{ r.patient.hn or '-' }}</td>
+                        <td class="px-4 py-3">
+                            <span class="text-sm font-medium text-slate-700">{{ r.patient.full_name }}</span>
+                        </td>
+                        <td class="px-3 py-3 text-center">
+                            <span class="text-sm font-bold {% if r.adh7.percent >= 80 %}text-emerald-600{% elif r.adh7.percent >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">
+                                {{ r.adh7.percent }}%
+                            </span>
+                        </td>
+                        <td class="px-3 py-3 text-center">
+                            <span class="text-sm font-bold {% if r.adh30.percent >= 80 %}text-emerald-600{% elif r.adh30.percent >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">
+                                {{ r.adh30.percent }}%
+                            </span>
+                        </td>
+                        <td class="px-3 py-3 text-center text-sm text-emerald-600 hidden sm:table-cell">{{ r.adh30.taken }}</td>
+                        <td class="px-3 py-3 text-center text-sm text-rose-600 hidden sm:table-cell">{{ r.adh30.missed }}</td>
+                        <td class="px-3 py-3 text-center">
+                            <span class="text-sm font-semibold text-indigo-600">{{ r.streak }}</span>
+                            <span class="text-xs text-slate-400">วัน</span>
+                        </td>
+                        <td class="px-3 py-3 text-center hidden md:table-cell">
+                            {% if r.last_inr %}
+                            <span class="text-sm font-medium text-slate-700">{{ r.last_inr.value }}</span>
+                            <span class="text-xs text-slate-400">({{ r.last_inr.test_date }})</span>
+                            {% else %}
+                            <span class="text-xs text-slate-400">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not report_data %}
+                    <tr><td colspan="8" class="px-6 py-12 text-center text-sm text-slate-400">ไม่มีข้อมูล</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="flex flex-wrap gap-4 text-xs text-slate-500">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> ≥80% ดี</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-amber-500"></span> 50-79% ปานกลาง</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-rose-500"></span> <50% ต้องปรับปรุง</span>
+    </div>
+</div>
+{% endblock %}

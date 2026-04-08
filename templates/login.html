@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบ | ระบบติดตามวาร์ฟาริน</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md">
+        <!-- Logo / Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4 shadow-lg shadow-indigo-200">
+                <span class="text-3xl">&#128138;</span>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800">ระบบติดตามการใช้ยาวาร์ฟาริน</h1>
+            <p class="text-slate-500 mt-1">โรงพยาบาลสุไหงปาดี</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+            <h2 class="text-lg font-semibold text-slate-700 mb-6">เข้าสู่ระบบ</h2>
+
+            {% if error %}
+            <div class="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2">
+                <svg class="w-5 h-5 text-rose-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span class="text-sm text-rose-700">{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/login" class="space-y-5">
+                <!-- Username -->
+                <div>
+                    <label for="username" class="block text-sm font-medium text-slate-700 mb-1.5">ชื่อผู้ใช้</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        </div>
+                        <input type="text" id="username" name="username" required autocomplete="username"
+                            class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                            placeholder="กรอกชื่อผู้ใช้">
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-slate-700 mb-1.5">รหัสผ่าน</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        </div>
+                        <input type="password" id="password" name="password" required autocomplete="current-password"
+                            class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                            placeholder="กรอกรหัสผ่าน">
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <button type="submit"
+                    class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    เข้าสู่ระบบ
+                </button>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <p class="text-center text-xs text-slate-400 mt-6">
+            ระบบติดตามการใช้ยาวาร์ฟาริน &copy; {{ current_year | default('2026') }} รพ.สุไหงปาดี
+        </p>
+    </div>
+
+</body>
+</html>

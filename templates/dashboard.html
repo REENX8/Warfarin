@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}แดชบอร์ด{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-800">แดชบอร์ด</h1>
+        <p class="text-sm text-slate-500 mt-1">ภาพรวมการติดตามผู้ป่วยวาร์ฟารินวันนี้</p>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">ผู้ป่วยทั้งหมด</p>
+                    <p class="text-2xl font-bold text-slate-800 mt-1">{{ total_patients }}</p>
+                </div>
+                <div class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">กินยาวันนี้</p>
+                    <p class="text-2xl font-bold text-emerald-600 mt-1">{{ today_taken }}</p>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">ยังไม่กิน</p>
+                    <p class="text-2xl font-bold text-amber-600 mt-1">{{ today_pending }}</p>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">พลาดวันนี้</p>
+                    <p class="text-2xl font-bold text-rose-600 mt-1">{{ today_missed }}</p>
+                </div>
+                <div class="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Two-column layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- At-risk patients -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h2 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+                    ผู้ป่วยเสี่ยง
+                </h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead><tr class="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left">ชื่อ</th>
+                        <th class="px-6 py-3 text-center">Adherence</th>
+                        <th class="px-6 py-3 text-center">พลาด</th>
+                    </tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for item in at_risk_patients %}
+                        <tr class="hover:bg-slate-50 cursor-pointer transition-colors" onclick="window.location='/patients/{{ item.patient.patient_id }}'">
+                            <td class="px-6 py-3.5">
+                                <div class="flex items-center gap-2">
+                                    {% if item.adherence.percent < 50 %}<span class="text-rose-500">⚠</span>{% endif %}
+                                    <span class="text-sm font-medium text-slate-700">{{ item.patient.full_name }}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-3.5 text-center">
+                                <span class="text-sm font-semibold {% if item.adherence.percent >= 80 %}text-emerald-600{% elif item.adherence.percent >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">
+                                    {{ item.adherence.percent }}%
+                                </span>
+                            </td>
+                            <td class="px-6 py-3.5 text-center text-sm text-rose-600 font-medium">{{ item.adherence.missed }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not at_risk_patients %}
+                        <tr><td colspan="3" class="px-6 py-8 text-center text-sm text-slate-400">ไม่มีผู้ป่วยเสี่ยงในขณะนี้ 🎉</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recent activity -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h2 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    กิจกรรมล่าสุด
+                </h2>
+            </div>
+            <div class="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                {% for act in recent_activity %}
+                <div class="px-6 py-3.5 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                    <div class="flex-shrink-0">
+                        {% if act.status in ('taken', 'late') %}
+                        <div class="w-8 h-8 bg-emerald-50 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        </div>
+                        {% else %}
+                        <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-slate-700">
+                            <span class="font-medium">{{ act.full_name }}</span>
+                            <span class="text-slate-500">ยืนยันกินยา {{ act.warfarin_mg }}mg</span>
+                        </p>
+                        <p class="text-xs text-slate-400 mt-0.5">{{ act.confirmed_at[:16] if act.confirmed_at else '' }}</p>
+                    </div>
+                    <div>
+                        {% if act.status == 'taken' %}
+                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">กินแล้ว</span>
+                        {% elif act.status == 'late' %}
+                        <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">สาย</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not recent_activity %}
+                <div class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีกิจกรรมวันนี้</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

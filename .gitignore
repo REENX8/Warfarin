@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+medtrack.db
+medtrack_backup.db
+*.db-journal
+*.db-wal
+*.db-shm
+app_old.py
+adee.py
+kk.py
+dose_qr.png
+qrm.py
+chapter1_text.txt
+chapter3_text.txt
+New Text Document.txt

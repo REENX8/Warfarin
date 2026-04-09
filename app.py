@@ -66,6 +66,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 os.makedirs("templates", exist_ok=True)
 os.makedirs("static", exist_ok=True)
 templates = Jinja2Templates(directory="templates")
+templates.env.cache = {}
+templates.env.cache_size = 0
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 SESSIONS: dict[str, dict] = {}

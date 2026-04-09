@@ -816,8 +816,8 @@ def reports_page(request: Request):
             "SELECT AVG(ease_of_use) ease, AVG(line_satisfaction) line_sat, "
             "AVG(reminder_helpful) remind, COUNT(*) total FROM satisfaction_surveys"
         ).fetchone()
-    return templates.TemplateResponse("reports.html", {
-        "request": request, "user": user, "report_data": data,
+    return templates.TemplateResponse(request, "reports.html", {
+        "user": user, "report_data": data,
         "survey_summary": dict(survey_summary) if survey_summary else None,
     })
 

@@ -408,8 +408,8 @@ def login_post(request: Request, username: str = Form(...), password: str = Form
     if (now - attempt["window_start"]).total_seconds() > 900:
         attempt = {"count": 0, "window_start": now}
     if attempt["count"] >= 5:
-        return templates.TemplateResponse("login.html", {
-            "request": request, "error": "พยายาม login มากเกินไป กรุณารอ 15 นาที",
+        return templates.TemplateResponse(request, "login.html", {
+            "error": "พยายาม login มากเกินไป กรุณารอ 15 นาที",
             "current_year": now.year,
         })
 

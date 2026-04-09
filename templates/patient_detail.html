@@ -8,10 +8,16 @@
             <h1 class="text-2xl font-bold text-slate-800 mt-1">{{ patient.full_name }}</h1>
             <p class="text-sm text-slate-500">HN: {{ patient.hn or '-' }} | อายุ: {{ patient.age_years or '-' }} ปี | น้ำหนัก: {{ patient.weight_kg or '-' }} kg</p>
         </div>
-        <a href="/patients/{{ patient.patient_id }}/edit" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-            แก้ไข
-        </a>
+        <div class="flex gap-2">
+            <a href="/patients/{{ patient.patient_id }}/survey" class="inline-flex items-center gap-2 px-4 py-2 bg-violet-50 border border-violet-200 text-violet-700 text-sm font-medium rounded-lg hover:bg-violet-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                แบบสอบถาม
+            </a>
+            <a href="/patients/{{ patient.patient_id }}/edit" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                แก้ไข
+            </a>
+        </div>
     </div>
 
     <!-- Patient info + Caregiver -->
@@ -211,6 +217,45 @@
         <div class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีผลแบบทดสอบ</div>
         {% endif %}
     </div>
+
+    <!-- Satisfaction Survey Results -->
+    {% if surveys %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">ผลแบบสอบถามความพึงพอใจ</h2>
+            <a href="/patients/{{ patient.patient_id }}/survey" class="text-sm text-violet-600 hover:text-violet-800 font-medium">+ เพิ่ม</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full"><thead class="bg-slate-50"><tr class="text-xs font-medium text-slate-500 uppercase">
+                <th class="px-6 py-2.5 text-left">วันที่</th>
+                <th class="px-4 py-2.5 text-center">ใช้งาน</th>
+                <th class="px-4 py-2.5 text-center">LINE</th>
+                <th class="px-4 py-2.5 text-center">การเตือน</th>
+                <th class="px-4 py-2.5 text-left hidden md:table-cell">ความคิดเห็น</th>
+            </tr></thead><tbody class="divide-y divide-slate-100">
+                {% for sv in surveys %}
+                <tr class="hover:bg-slate-50">
+                    <td class="px-6 py-2.5 text-sm text-slate-600">{{ sv.survey_date }}</td>
+                    <td class="px-4 py-2.5 text-center text-sm font-semibold text-slate-700">{{ sv.ease_of_use }}/5</td>
+                    <td class="px-4 py-2.5 text-center text-sm font-semibold text-slate-700">{{ sv.line_satisfaction }}/5</td>
+                    <td class="px-4 py-2.5 text-center text-sm font-semibold text-slate-700">{{ sv.reminder_helpful }}/5</td>
+                    <td class="px-4 py-2.5 text-sm text-slate-500 hidden md:table-cell">{{ sv.comments or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody></table>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center justify-between">
+        <div>
+            <p class="text-sm font-medium text-slate-700">แบบสอบถามความพึงพอใจ</p>
+            <p class="text-xs text-slate-400 mt-0.5">ยังไม่มีแบบสอบถาม</p>
+        </div>
+        <a href="/patients/{{ patient.patient_id }}/survey" class="inline-flex items-center gap-2 px-3 py-2 bg-violet-50 text-violet-700 text-sm font-medium rounded-lg hover:bg-violet-100 transition-colors">
+            + เพิ่มแบบสอบถาม
+        </a>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 

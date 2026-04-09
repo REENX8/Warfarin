@@ -395,8 +395,8 @@ def root(request: Request):
 
 @app.get("/login")
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {
-        "request": request, "error": "", "current_year": datetime.now(TZ).year,
+    return templates.TemplateResponse(request, "login.html", {
+        "error": "", "current_year": datetime.now(TZ).year,
     })
 
 @app.post("/login")

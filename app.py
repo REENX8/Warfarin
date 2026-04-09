@@ -418,8 +418,8 @@ def login_post(request: Request, username: str = Form(...), password: str = Form
     if not staff or staff["password_hash"] != _hash_pw(password):
         attempt["count"] += 1
         _login_attempts[ip] = attempt
-        return templates.TemplateResponse("login.html", {
-            "request": request, "error": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+        return templates.TemplateResponse(request, "login.html", {
+            "error": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
             "current_year": now.year,
         })
 
@@ -474,8 +474,8 @@ def dashboard(request: Request):
             "SELECT mp.*, p.full_name, p.hn FROM medication_plan mp JOIN patients p ON mp.patient_id=p.patient_id "
             "WHERE mp.status IN ('taken','late') ORDER BY mp.confirmed_at DESC LIMIT 10"
         ).fetchall()
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request, "user": user, "total_patients": total_patients,
+    return templates.TemplateResponse(request, "dashboard.html", {
+        "user": user, "total_patients": total_patients,
         "active_patients": active_patients, "today_taken": today_taken,
         "today_missed": today_missed, "today_pending": today_pending,
         "adherence_avg": adherence_avg, "at_risk_patients": at_risk,
@@ -500,14 +500,18 @@ def patients_list(request: Request, q: str = ""):
             rows = conn.execute("SELECT * FROM patients ORDER BY full_name").fetchall()
     # แปลง Row → dict ก่อนส่งไป template
     patients = [dict(p) for p in rows]
-    return templates.TemplateResponse("patients.html", {"request": request, "user": user, "patients": patients, "q": q})
+    return templates.TemplateResponse(request, "patients.html", {
+        "user": user, "patients": patients, "q": q
+    })
 
 @app.get("/patients/new")
 def patient_new_form(request: Request):
     user = get_current_user(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
-    return templates.TemplateResponse("patient_form.html", {"request": request, "user": user, "patient": None, "caregivers": []})
+    return templates.TemplateResponse(request, "patient_form.html", {
+        "user": user, "patient": None, "caregivers": []
+    })
 
 @app.post("/patients/new")
 async def patient_create(request: Request):
@@ -558,8 +562,8 @@ def patient_detail(request: Request, pid: int):
         surveys = conn.execute(
             "SELECT * FROM satisfaction_surveys WHERE patient_id=? ORDER BY survey_date DESC LIMIT 5", (pid,)
         ).fetchall()
-    return templates.TemplateResponse("patient_detail.html", {
-        "request": request, "user": user, "patient": dict(patient),
+    return templates.TemplateResponse(request, "patient_detail.html", {
+        "user": user, "patient": dict(patient),
         "caregivers": [dict(c) for c in caregivers], "doses": [dict(d) for d in doses],
         "labs": [dict(l) for l in labs], "scores": [dict(s) for s in scores],
         "adh7": adh7, "adh30": adh30, "adh_all": adh_all,

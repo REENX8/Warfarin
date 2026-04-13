@@ -26,6 +26,7 @@
                         <th class="px-3 py-3 text-center hidden sm:table-cell">กิน</th>
                         <th class="px-3 py-3 text-center hidden sm:table-cell">พลาด</th>
                         <th class="px-3 py-3 text-center">Streak</th>
+                        <th class="px-3 py-3 text-center hidden md:table-cell">TTR</th>
                         <th class="px-3 py-3 text-center hidden md:table-cell">INR ล่าสุด</th>
                     </tr>
                 </thead>
@@ -53,6 +54,11 @@
                             <span class="text-xs text-slate-400">วัน</span>
                         </td>
                         <td class="px-3 py-3 text-center hidden md:table-cell">
+                            {% if r.ttr is not none %}
+                            <span class="text-sm font-semibold {% if r.ttr >= 65 %}text-emerald-600{% else %}text-amber-600{% endif %}">{{ r.ttr }}%</span>
+                            {% else %}<span class="text-xs text-slate-400">-</span>{% endif %}
+                        </td>
+                        <td class="px-3 py-3 text-center hidden md:table-cell">
                             {% if r.last_inr %}
                             <span class="text-sm font-medium text-slate-700">{{ r.last_inr.value }}</span>
                             <span class="text-xs text-slate-400">({{ r.last_inr.test_date }})</span>
@@ -63,7 +69,7 @@
                     </tr>
                     {% endfor %}
                     {% if not report_data %}
-                    <tr><td colspan="8" class="px-6 py-12 text-center text-sm text-slate-400">ไม่มีข้อมูล</td></tr>
+                    <tr><td colspan="9" class="px-6 py-12 text-center text-sm text-slate-400">ไม่มีข้อมูล</td></tr>
                     {% endif %}
                 </tbody>
             </table>

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-800">Audit Log</h1>
+        <p class="text-sm text-slate-500 mt-1">บันทึกการกระทำทั้งหมดในระบบ (300 รายการล่าสุด)</p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-slate-50">
+                    <tr class="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left">เวลา</th>
+                        <th class="px-4 py-3 text-left">ผู้ทำ</th>
+                        <th class="px-4 py-3 text-left">กระทำ</th>
+                        <th class="px-4 py-3 text-left">Entity</th>
+                        <th class="px-4 py-3 text-left">ID</th>
+                        <th class="px-4 py-3 text-left">รายละเอียด</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for l in logs %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{{ l.created_at[:16] if l.created_at else '-' }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-700">{{ l.performed_by }}</td>
+                        <td class="px-4 py-3 text-sm font-medium text-indigo-600">{{ l.action }}</td>
+                        <td class="px-4 py-3 text-xs text-slate-500">{{ l.entity_type }}</td>
+                        <td class="px-4 py-3 text-xs text-slate-400">{{ l.entity_id }}</td>
+                        <td class="px-4 py-3 text-xs text-slate-600">{{ l.details }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not logs %}
+                    <tr><td colspan="6" class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีข้อมูล</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

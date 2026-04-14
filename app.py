@@ -35,6 +35,16 @@ try:
 except ImportError:
     LINE_SDK_AVAILABLE = False
 
+# LINE Flex Messages (optional — ตก text fallback เมื่อ import ไม่ได้)
+try:
+    from linebot.v3.messaging import (
+        FlexMessage, FlexBubble, FlexCarousel, FlexBox,
+        FlexText, FlexButton, FlexSeparator, URIAction,
+    )
+    FLEX_AVAILABLE = True
+except ImportError:
+    FLEX_AVAILABLE = False
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -1189,6 +1199,7 @@ if LINE_SDK_AVAILABLE and line_handler:
             "• 'inr' — ดูผล INR ล่าสุด\n"
             "• 'streak' — ดูจำนวนวันต่อเนื่อง\n"
             "• 'อาการ' — รายงานอาการไม่พึงประสงค์\n"
+            "• 'ความรู้' — คู่มือผู้ป่วยวาร์ฟาริน\n"
             "• 'help' — ดูเมนูช่วยเหลือ"
         )
         if line_api:
@@ -1204,45 +1215,66 @@ if LINE_SDK_AVAILABLE and line_handler:
         uid = event.source.user_id
         raw = event.message.text.strip()
         text = raw.lower()
-        reply = _route_line_command(uid, raw, text)
-        if line_api:
-            try:
-                line_api.reply_message(ReplyMessageRequest(
-                    reply_token=event.reply_token, messages=[TextMessage(text=reply[:4900])]
-                ))
-            except Exception:
-                pass
+        messages = _route_line_command(uid, raw, text)
+        if line_api and messages:
+            # กรองเฉพาะ Message objects (กันกรณี _wrap_text คืน str เมื่อ SDK ไม่พร้อม)
+            payload = [m for m in messages if not isinstance(m, str)][:5]
+            if payload:
+                try:
+                    line_api.reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token, messages=payload
+                    ))
+                except Exception:
+                    pass
 
     @line_handler.add(UnfollowEvent)
     def handle_unfollow(event):
         with db() as conn:
             log_audit(conn, "line_unfollow", "line", event.source.user_id, "system", "")
 
-def _route_line_command(uid: str, raw: str, text: str) -> str:
-    """Route LINE commands. `raw` คือข้อความต้นฉบับ, `text` คือ lowercased"""
+def _wrap_text(s: str) -> list:
+    """แปลง str → list[TextMessage] (หรือ list[str] เมื่อ SDK ไม่พร้อม)"""
+    if LINE_SDK_AVAILABLE:
+        return [TextMessage(text=s[:4900])]
+    return [s[:4900]]
+
+def _flex_or_text(flex_fn, text_fn, pt: sqlite3.Row) -> list:
+    """พยายามสร้าง Flex ก่อน ถ้าไม่ได้ตก text fallback"""
+    if FLEX_AVAILABLE:
+        try:
+            m = flex_fn(pt)
+            if m is not None:
+                return [m]
+        except Exception:
+            pass
+    return _wrap_text(text_fn(pt))
+
+def _route_line_command(uid: str, raw: str, text: str) -> list:
+    """Route LINE commands. คืน list[Message] — มี fallback เป็น TextMessage เสมอ
+    `raw` คือข้อความต้นฉบับ, `text` คือ lowercased"""
     # Registration (allow without existing link)
     if raw.startswith("ลงทะเบียน") or text.startswith("register"):
         parts = raw.replace("ลงทะเบียน", "").replace("register", "").strip().split()
         if not parts:
-            return "กรุณาพิมพ์: ลงทะเบียน <HN>\nตัวอย่าง: ลงทะเบียน 12345"
+            return _wrap_text("กรุณาพิมพ์: ลงทะเบียน <HN>\nตัวอย่าง: ลงทะเบียน 12345")
         hn = parts[0]
         with db() as conn:
             pt = conn.execute("SELECT * FROM patients WHERE hn=? AND active=1", (hn,)).fetchone()
             if not pt:
-                return f"ไม่พบผู้ป่วย HN: {hn}\nกรุณาติดต่อเภสัชกร"
+                return _wrap_text(f"ไม่พบผู้ป่วย HN: {hn}\nกรุณาติดต่อเภสัชกร")
             if pt["line_user_id"] and pt["line_user_id"] != uid:
-                return "HN นี้ถูกลงทะเบียนไปแล้ว หากเป็นของคุณกรุณาติดต่อเภสัชกร"
+                return _wrap_text("HN นี้ถูกลงทะเบียนไปแล้ว หากเป็นของคุณกรุณาติดต่อเภสัชกร")
             conn.execute("UPDATE patients SET line_user_id=?, updated_at=? WHERE patient_id=?",
                          (uid, _now(), pt["patient_id"]))
             log_audit(conn, "line_register", "patient", pt["patient_id"], uid, f"linked HN={hn}")
-        return (
+        return _wrap_text(
             f"✅ ลงทะเบียนสำเร็จ\n"
             f"คุณ{pt['full_name']} (HN: {hn})\n\n"
             f"พิมพ์ 'help' เพื่อดูเมนูคำสั่ง"
         )
     # Help
     if text in ("help", "ช่วยเหลือ", "เมนู", "menu"):
-        return (
+        return _wrap_text(
             "📋 เมนูคำสั่ง:\n"
             "• สถานะ — สถานะยาวันนี้\n"
             "• ยา — รายละเอียดยา + ลิงก์ยืนยัน\n"
@@ -1250,37 +1282,48 @@ def _route_line_command(uid: str, raw: str, text: str) -> str:
             "• inr — ผล INR ล่าสุด\n"
             "• streak — จำนวนวันต่อเนื่อง\n"
             "• อาการ — รายงานอาการไม่พึงประสงค์\n"
+            "• ความรู้ — คู่มือผู้ป่วยวาร์ฟาริน\n"
             "• ลงทะเบียน <HN> — เชื่อมบัญชี LINE\n"
             "• help — เมนูนี้"
         )
+    # Education (ไม่ต้องลงทะเบียนก็ใช้ได้)
+    if raw in ("ความรู้", "คู่มือ") or text in ("knowledge", "edu", "education"):
+        if FLEX_AVAILABLE:
+            try:
+                m = _flex_education_carousel()
+                if m is not None:
+                    return [m]
+            except Exception:
+                pass
+        return _wrap_text(_get_education_text())
     # Commands ที่ต้องการผู้ป่วยลงทะเบียนแล้ว
     with db() as conn:
         pt = conn.execute("SELECT * FROM patients WHERE line_user_id=? AND active=1", (uid,)).fetchone()
     if not pt:
-        return (
+        return _wrap_text(
             "⚠️ ไม่พบข้อมูลผู้ป่วย\n"
             "พิมพ์: ลงทะเบียน <HN>\n"
             "หรือติดต่อเภสัชกร"
         )
     if text in ("สถานะ", "status"):
-        return _get_status_reply(pt)
+        return _flex_or_text(_flex_status_bubble, _get_status_reply, pt)
     if text in ("ยา", "dose", "doses"):
-        return _get_dose_reply(pt)
+        return _flex_or_text(_flex_dose_bubble, _get_dose_reply, pt)
     if text in ("adherence", "ความสม่ำเสมอ"):
-        return _get_adherence_reply(pt)
+        return _flex_or_text(_flex_adherence_bubble, _get_adherence_reply, pt)
     if text in ("inr", "lab", "ผลเลือด"):
-        return _get_inr_reply(pt)
+        return _flex_or_text(_flex_inr_bubble, _get_inr_reply, pt)
     if text in ("streak", "ต่อเนื่อง"):
-        return _get_streak_reply(pt)
+        return _flex_or_text(_flex_streak_bubble, _get_streak_reply, pt)
     if raw in ("อาการ", "symptom", "symptoms") or text == "symptom":
-        return (
+        return _wrap_text(
             f"📝 รายงานอาการไม่พึงประสงค์\n"
             f"กรุณากดลิงก์:\n{BASE_URL}/report/symptom/{pt['patient_id']}\n\n"
             f"หากมีอาการรุนแรง เช่น เลือดออกมาก ปัสสาวะสีชา อาเจียนเป็นเลือด "
             f"กรุณาพบแพทย์ทันที"
         )
     # Fallback
-    return (
+    return _wrap_text(
         "ไม่เข้าใจคำสั่ง 🤔\n"
         "พิมพ์ 'help' เพื่อดูเมนู\n"
         "หรือพิมพ์ 'สถานะ' เพื่อดูสถานะยาวันนี้"
@@ -1379,6 +1422,244 @@ def _get_streak_reply(pt: sqlite3.Row) -> str:
     return f"{emoji} ต่อเนื่อง {streak} วัน\n{praise}"
 
 # ---------------------------------------------------------------------------
+# LINE Flex Message builders
+# ใช้คู่กับ _get_*_reply — มี fallback เป็น text เมื่อ FLEX_AVAILABLE=False
+# ---------------------------------------------------------------------------
+def _flex_alt(text: str, limit: int = 400) -> str:
+    """ตัดข้อความให้สั้นพอสำหรับ alt_text"""
+    t = text.replace("\n", " ").strip()
+    return t[:limit]
+
+def _flex_bubble(header_text: str, header_color: str, body_rows: list, footer_button=None):
+    """สร้าง FlexBubble มาตรฐาน (header + body ที่เป็นรายการ text + footer ปุ่มทางเลือก)"""
+    if not FLEX_AVAILABLE:
+        return None
+    header = FlexBox(
+        layout="vertical",
+        padding_all="16px",
+        background_color=header_color,
+        contents=[FlexText(text=header_text, color="#ffffff", weight="bold", size="lg", wrap=True)],
+    )
+    body_contents = []
+    for row in body_rows:
+        # row = (label, value) หรือ str
+        if isinstance(row, tuple):
+            label, value = row
+            body_contents.append(FlexBox(
+                layout="baseline", spacing="sm",
+                contents=[
+                    FlexText(text=label, color="#64748b", size="sm", flex=3),
+                    FlexText(text=str(value), color="#0f172a", size="sm", weight="bold", flex=5, wrap=True, align="end"),
+                ],
+            ))
+        else:
+            body_contents.append(FlexText(text=str(row), color="#475569", size="sm", wrap=True))
+    body = FlexBox(layout="vertical", spacing="md", padding_all="16px", contents=body_contents)
+    kwargs = {"header": header, "body": body}
+    if footer_button is not None:
+        kwargs["footer"] = FlexBox(layout="vertical", padding_all="12px", contents=[footer_button])
+    return FlexBubble(**kwargs)
+
+def _flex_status_bubble(pt: sqlite3.Row):
+    if not FLEX_AVAILABLE:
+        return None
+    with db() as conn:
+        doses = conn.execute(
+            "SELECT * FROM medication_plan WHERE patient_id=? AND scheduled_date=? ORDER BY scheduled_time",
+            (pt["patient_id"], _today()),
+        ).fetchall()
+        adh = compute_adherence(conn, pt["patient_id"], 7)
+        streak = compute_streak(conn, pt["patient_id"])
+    status_map = {"taken": "กินแล้ว ✅", "late": "กินแล้ว (ช้า) ⏰",
+                  "missed": "พลาด ❌", "planned": "รอกิน 🕐"}
+    rows = [(f"คุณ {pt['full_name']}", _today())]
+    if not doses:
+        rows.append("วันนี้ไม่มีแผนกินยาค่ะ")
+    else:
+        for d in doses:
+            rows.append((f"{d['scheduled_time']} น.", f"{d['warfarin_mg']}mg — {status_map.get(d['status'], d['status'])}"))
+    rows.append(("Adherence 7 วัน", f"{adh['percent']}%"))
+    rows.append(("🔥 Streak", f"{streak} วัน"))
+    bubble = _flex_bubble("📅 สถานะยาวันนี้", "#4f46e5", rows)
+    if bubble is None:
+        return None
+    return FlexMessage(alt_text=_flex_alt(_get_status_reply(pt)), contents=bubble)
+
+def _flex_dose_bubble(pt: sqlite3.Row):
+    if not FLEX_AVAILABLE:
+        return None
+    with db() as conn:
+        dose = conn.execute(
+            "SELECT mp.*, dt.token_id FROM medication_plan mp "
+            "LEFT JOIN dose_tokens dt ON mp.dose_id=dt.dose_id "
+            "WHERE mp.patient_id=? AND mp.scheduled_date=? "
+            "ORDER BY mp.scheduled_time LIMIT 1",
+            (pt["patient_id"], _today()),
+        ).fetchone()
+    if not dose:
+        return None
+    status_map = {"taken": "กินแล้ว ✅", "late": "กินแล้ว (ช้า) ⏰",
+                  "missed": "พลาด ❌", "planned": "ยังไม่ยืนยัน 🕐"}
+    rows = [
+        ("ขนาดยา", f"{dose['warfarin_mg']} mg"),
+        ("รายละเอียด", dose["pill_description"] or "ยาวาร์ฟาริน"),
+        ("เวลา", f"{dose['scheduled_time']} น."),
+        ("สถานะ", status_map.get(dose["status"], dose["status"])),
+    ]
+    footer = None
+    if dose["status"] == "planned" and dose["token_id"]:
+        footer = FlexButton(
+            style="primary", color="#059669", height="sm",
+            action=URIAction(label="กดยืนยันกินยา ✅", uri=f"{BASE_URL}/dose/{dose['token_id']}"),
+        )
+    bubble = _flex_bubble("💊 ยาวาร์ฟาริน", "#059669", rows, footer_button=footer)
+    return FlexMessage(alt_text=_flex_alt(_get_dose_reply(pt)), contents=bubble) if bubble else None
+
+def _flex_adherence_bubble(pt: sqlite3.Row):
+    if not FLEX_AVAILABLE:
+        return None
+    with db() as conn:
+        a7 = compute_adherence(conn, pt["patient_id"], 7)
+        a30 = compute_adherence(conn, pt["patient_id"], 30)
+        streak = compute_streak(conn, pt["patient_id"])
+    gam = compute_gamification_score(a7["percent"], streak)
+    rows = [
+        (f"คุณ {pt['full_name']}", ""),
+        ("7 วัน", f"{a7['percent']}% ({a7['taken']}/{a7['total']})"),
+        ("30 วัน", f"{a30['percent']}% ({a30['taken']}/{a30['total']})"),
+        ("🔥 Streak", f"{streak} วัน"),
+        ("🏆 คะแนน", str(gam)),
+    ]
+    bubble = _flex_bubble("📊 ความสม่ำเสมอ", "#0891b2", rows)
+    return FlexMessage(alt_text=_flex_alt(_get_adherence_reply(pt)), contents=bubble) if bubble else None
+
+def _flex_inr_bubble(pt: sqlite3.Row):
+    if not FLEX_AVAILABLE:
+        return None
+    with db() as conn:
+        labs = conn.execute(
+            "SELECT value, test_date, in_range FROM lab_results "
+            "WHERE patient_id=? ORDER BY test_date DESC LIMIT 3",
+            (pt["patient_id"],),
+        ).fetchall()
+    rows = [("เป้าหมาย", f"{pt['target_inr_min']}-{pt['target_inr_max']}")]
+    if not labs:
+        rows.append("ยังไม่มีผลการตรวจ INR")
+    else:
+        for l in labs:
+            mark = "✅" if l["in_range"] else "⚠️"
+            rows.append((l["test_date"], f"{l['value']} {mark}"))
+    bubble = _flex_bubble("🧪 ผล INR ล่าสุด", "#9333ea", rows)
+    return FlexMessage(alt_text=_flex_alt(_get_inr_reply(pt)), contents=bubble) if bubble else None
+
+def _flex_streak_bubble(pt: sqlite3.Row):
+    if not FLEX_AVAILABLE:
+        return None
+    with db() as conn:
+        streak = compute_streak(conn, pt["patient_id"])
+    if streak >= 30:
+        emoji, praise, color = "🏆", "สุดยอด! คุณคือแชมป์ความสม่ำเสมอ", "#f59e0b"
+    elif streak >= 14:
+        emoji, praise, color = "🥇", "ยอดเยี่ยมมาก รักษาไว้นะคะ", "#eab308"
+    elif streak >= 7:
+        emoji, praise, color = "🥈", "ดีมาก! อีกนิดเดียวจะถึง 2 สัปดาห์", "#14b8a6"
+    elif streak >= 1:
+        emoji, praise, color = "🎯", "เริ่มต้นดีมาก พยายามต่อไปนะคะ", "#0ea5e9"
+    else:
+        emoji, praise, color = "💪", "มาเริ่มสร้างสถิติกันใหม่นะคะ", "#64748b"
+    rows = [
+        (f"{emoji} ต่อเนื่อง", f"{streak} วัน"),
+        praise,
+    ]
+    bubble = _flex_bubble("🔥 Streak", color, rows)
+    return FlexMessage(alt_text=_flex_alt(_get_streak_reply(pt)), contents=bubble) if bubble else None
+
+def _flex_education_carousel():
+    """Flex carousel 4 bubbles สำหรับคำสั่ง 'ความรู้'"""
+    if not FLEX_AVAILABLE:
+        return None
+    topics = [
+        {
+            "title": "💊 วาร์ฟาริน คืออะไร",
+            "color": "#4f46e5",
+            "anchor": "basics",
+            "rows": [
+                "ยาต้านการแข็งตัวของเลือด",
+                "กินตรงเวลาทุกวัน",
+                "ห้ามหยุดยาเอง ห้ามเพิ่ม/ลดขนาดเอง",
+                "ต้องตรวจ INR สม่ำเสมอ",
+            ],
+        },
+        {
+            "title": "🥬 อาหารและวิตามินเค",
+            "color": "#059669",
+            "anchor": "vitk",
+            "rows": [
+                "ผักใบเขียวเข้มมีวิตามินเคสูง",
+                "กินในปริมาณสม่ำเสมอทุกวัน",
+                "ไม่ต้องงดเด็ดขาด แต่ห้ามกินเยอะผิดปกติ",
+                "งดแอลกอฮอล์ และอาหารเสริม",
+            ],
+        },
+        {
+            "title": "🚨 สัญญาณอันตราย",
+            "color": "#dc2626",
+            "anchor": "danger",
+            "rows": [
+                "เลือดออกไม่หยุด / ช้ำผิดปกติ",
+                "อุจจาระดำ / ปัสสาวะสีชา",
+                "อาเจียนหรือไอเป็นเลือด",
+                "ปวดหัวรุนแรง เวียนศีรษะ",
+                "→ พบแพทย์ทันที",
+            ],
+        },
+        {
+            "title": "⏰ ลืมกินยา ทำอย่างไร",
+            "color": "#f59e0b",
+            "anchor": "missed",
+            "rows": [
+                "นึกได้ภายใน 12 ชม. → กินทันที",
+                "เกิน 12 ชม. → ข้ามไปมื้อถัดไป",
+                "ห้ามกินซ้อนเพื่อชดเชย",
+                "แจ้งเภสัชกรที่คลินิกครั้งถัดไป",
+            ],
+        },
+    ]
+    bubbles = []
+    for t in topics:
+        footer = FlexButton(
+            style="link", height="sm",
+            action=URIAction(label="อ่านเพิ่มเติม", uri=f"{BASE_URL}/education#{t['anchor']}"),
+        )
+        b = _flex_bubble(t["title"], t["color"], t["rows"], footer_button=footer)
+        if b is not None:
+            bubbles.append(b)
+    if not bubbles:
+        return None
+    alt = "คู่มือผู้ป่วยวาร์ฟาริน: พื้นฐานยา, วิตามินเค, สัญญาณอันตราย, ลืมกินยา"
+    return FlexMessage(alt_text=alt, contents=FlexCarousel(contents=bubbles))
+
+def _get_education_text() -> str:
+    """ข้อความ fallback สำหรับคำสั่ง 'ความรู้' เมื่อ Flex ไม่พร้อมใช้"""
+    return (
+        "📚 คู่มือผู้ป่วยวาร์ฟาริน\n\n"
+        "💊 พื้นฐานยา\n"
+        "• ยาต้านการแข็งตัวของเลือด\n"
+        "• กินตรงเวลาทุกวัน ห้ามหยุดเอง\n"
+        "• ตรวจ INR สม่ำเสมอ\n\n"
+        "🥬 อาหาร / วิตามินเค\n"
+        "• ผักใบเขียวเข้มกินได้ แต่สม่ำเสมอ\n"
+        "• งดแอลกอฮอล์\n\n"
+        "🚨 สัญญาณอันตราย (พบแพทย์ทันที)\n"
+        "• เลือดออกไม่หยุด อุจจาระดำ\n"
+        "• ปัสสาวะสีชา อาเจียนเป็นเลือด\n\n"
+        "⏰ ลืมกินยา\n"
+        "• ภายใน 12 ชม. → กินทันที\n"
+        "• เกิน 12 ชม. → ข้ามมื้อ ห้ามกินซ้อน\n\n"
+        f"อ่านเพิ่มเติม: {BASE_URL}/education"
+    )
+
+# ---------------------------------------------------------------------------
 # API endpoints (JSON for AJAX / Chart.js)
 # ---------------------------------------------------------------------------
 @app.get("/api/patients/{pid}/inr-data")
@@ -1411,6 +1692,41 @@ def api_adherence_data(pid: int):
         v = daily[d]
         v["percent"] = round(v["taken"] / v["total"] * 100) if v["total"] else 0
         result.append(v)
+    return result
+
+@app.get("/api/patients/{pid}/heatmap-data")
+def api_heatmap_data(pid: int):
+    """90-day adherence heatmap — return [{date, status, total, taken}, ...]
+    status priority: missed > planned > late > taken; วันไม่มี dose = 'none'"""
+    today = _now_dt().date()
+    start = today - timedelta(days=89)
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT scheduled_date, status FROM medication_plan "
+            "WHERE patient_id=? AND scheduled_date>=? AND scheduled_date<=? "
+            "ORDER BY scheduled_date",
+            (pid, start.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")),
+        ).fetchall()
+    # group by date keeping highest priority status
+    priority = {"missed": 4, "planned": 3, "late": 2, "taken": 1}
+    daily: dict[str, dict] = {}
+    for r in rows:
+        d = r["scheduled_date"]
+        st = r["status"]
+        slot = daily.setdefault(d, {"date": d, "total": 0, "taken": 0, "status": "none"})
+        slot["total"] += 1
+        if st in ("taken", "late"):
+            slot["taken"] += 1
+        if priority.get(st, 0) > priority.get(slot["status"], 0):
+            slot["status"] = st
+    # fill missing days
+    result = []
+    for i in range(90):
+        d = (start + timedelta(days=i)).strftime("%Y-%m-%d")
+        if d in daily:
+            result.append(daily[d])
+        else:
+            result.append({"date": d, "status": "none", "total": 0, "taken": 0})
     return result
 
 # ---------------------------------------------------------------------------
@@ -1468,6 +1784,13 @@ def patient_qr_sheet(request: Request, pid: int):
 # ---------------------------------------------------------------------------
 # Symptom reporting (patient, no auth)
 # ---------------------------------------------------------------------------
+@app.get("/education")
+def education_page(request: Request):
+    """หน้าคู่มือผู้ป่วยวาร์ฟาริน (สาธารณะ, ไม่ต้อง login)"""
+    return templates.TemplateResponse(request, "education.html", {
+        "hospital_name": "โรงพยาบาลสุไหงปาดี",
+    })
+
 @app.get("/report/symptom/{pid}")
 def symptom_form(request: Request, pid: int):
     with db() as conn:

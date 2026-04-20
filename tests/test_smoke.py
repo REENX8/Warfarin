@@ -1,7 +1,8 @@
 """Smoke tests for Warfarin medication tracker.
 
 Covers: auth, dashboard render, QR PNG, heatmap API, LINE webhook signature,
-LINE command router (help, education), adherence math, TTR edge case, education page.
+LINE command router (help, education), adherence math, TTR edge case, education page,
+Quick Reply, targeted broadcast preview, Rich Menu image generation.
 """
 import sqlite3
 import uuid
@@ -177,3 +178,80 @@ def test_ttr_single_value_edge_case(db_conn, seed_patient):
     with app.db() as conn:
         v = app.compute_ttr(conn, pid)
     assert v is None or isinstance(v, (int, float))
+
+
+# ---------------------------------------------------------------------------
+# Quick Reply tests
+# ---------------------------------------------------------------------------
+def test_make_quick_reply_uri():
+    """URIAction สำหรับ URL, LineMessageAction สำหรับ text"""
+    qr = app._make_quick_reply([("กดยืนยัน", "http://localhost/dose/abc"), ("สถานะ", "สถานะ")])
+    if qr is None:
+        return  # SDK ไม่พร้อม — ข้าม
+    assert len(qr.items) == 2
+
+
+def test_make_quick_reply_max_13():
+    """ตัด items เกิน 13 ออก"""
+    items = [(str(i), str(i)) for i in range(20)]
+    qr = app._make_quick_reply(items)
+    if qr is None:
+        return
+    assert len(qr.items) <= 13
+
+
+def test_flex_status_bubble_has_quick_reply(db_conn, seed_patient):
+    """_flex_status_bubble ต้องแนบ quick_reply ถ้า FLEX_AVAILABLE"""
+    if not app.FLEX_AVAILABLE:
+        return
+    pid = seed_patient
+    pt_row = None
+    with app.db() as conn:
+        pt_row = conn.execute("SELECT * FROM patients WHERE patient_id=?", (pid,)).fetchone()
+    msg = app._flex_status_bubble(pt_row)
+    assert msg is not None
+    assert msg.quick_reply is not None
+    assert len(msg.quick_reply.items) >= 2
+
+
+# ---------------------------------------------------------------------------
+# Targeted broadcast preview
+# ---------------------------------------------------------------------------
+def test_broadcast_preview_all(admin_login, db_conn, seed_patient):
+    r = admin_login.get("/api/broadcast-preview?target=all")
+    assert r.status_code == 200
+    j = r.json()
+    assert "count" in j and isinstance(j["count"], int)
+
+
+def test_broadcast_preview_low_adherence(admin_login, db_conn, seed_patient):
+    r = admin_login.get("/api/broadcast-preview?target=low_adherence")
+    assert r.status_code == 200
+    j = r.json()
+    assert j["target"] == "low_adherence"
+    assert j["count"] == 0  # patient ไม่มี line_user_id → ไม่ถูกนับ
+
+
+def test_broadcast_with_target_field(admin_login):
+    """POST /line/broadcast รับ target field และคืน target ใน response"""
+    r = admin_login.post(
+        "/line/broadcast",
+        data={"message": "test", "target": "low_adherence"},
+    )
+    assert r.status_code == 200
+    j = r.json()
+    assert j.get("target") == "low_adherence"
+
+
+# ---------------------------------------------------------------------------
+# Rich Menu image
+# ---------------------------------------------------------------------------
+def test_build_rich_menu_image_returns_png():
+    """ภาพ Rich Menu ต้องเป็น PNG bytes"""
+    try:
+        from PIL import Image
+    except ImportError:
+        return  # Pillow ไม่มี — ข้าม
+    data = app._build_rich_menu_image()
+    assert data[:4] == b"\x89PNG", "output ต้องเป็น PNG"
+    assert len(data) > 1000  # มีเนื้อหา

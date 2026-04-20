@@ -45,6 +45,30 @@ try:
 except ImportError:
     FLEX_AVAILABLE = False
 
+# LINE Quick Reply + Rich Menu (optional)
+try:
+    from linebot.v3.messaging import (
+        QuickReply, QuickReplyItem,
+        MessageAction as LineMessageAction,
+        RichMenuRequest, RichMenuArea, RichMenuBounds, RichMenuSize,
+    )
+    QR_LINE_AVAILABLE = True
+except ImportError:
+    QR_LINE_AVAILABLE = False
+
+try:
+    from linebot.v3.messaging import MessagingApiBlob
+    BLOB_AVAILABLE = True
+except ImportError:
+    try:
+        from linebot.v3.messaging.api_blob import MessagingApiBlob
+        BLOB_AVAILABLE = True
+    except ImportError:
+        BLOB_AVAILABLE = False
+
+# Rich Menu id cache (ไม่ต้อง recreate ทุก restart ถ้า id เดิมยังใช้ได้)
+_rich_menu_id: str | None = None
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -74,6 +98,10 @@ async def lifespan(app: FastAPI):
         scheduler.add_job(job_mark_missed,           "cron", hour=21, minute=0,  id="mark_missed",   replace_existing=True)
         scheduler.add_job(job_cleanup_sessions,      "cron", hour=3,  minute=0,  id="clean_sessions",replace_existing=True)
         scheduler.start()
+    try:
+        _create_rich_menu()
+    except Exception as _e:
+        print(f"[WARN] Rich menu setup skipped: {_e}")
     yield
     if scheduler.running:
         scheduler.shutdown(wait=False)
@@ -1460,6 +1488,20 @@ def _flex_bubble(header_text: str, header_color: str, body_rows: list, footer_bu
         kwargs["footer"] = FlexBox(layout="vertical", padding_all="12px", contents=[footer_button])
     return FlexBubble(**kwargs)
 
+def _make_quick_reply(items: list) -> "QuickReply | None":
+    """สร้าง QuickReply จาก list ของ (label, text_or_uri)
+    ถ้า action เป็น URL ใช้ URIAction, มิฉะนั้นใช้ LineMessageAction"""
+    if not QR_LINE_AVAILABLE:
+        return None
+    qr_items = []
+    for label, action in items[:13]:
+        if action.startswith("http://") or action.startswith("https://"):
+            act = URIAction(label=label, uri=action)
+        else:
+            act = LineMessageAction(label=label, text=action)
+        qr_items.append(QuickReplyItem(action=act))
+    return QuickReply(items=qr_items) if qr_items else None
+
 def _flex_status_bubble(pt: sqlite3.Row):
     if not FLEX_AVAILABLE:
         return None
@@ -1483,7 +1525,9 @@ def _flex_status_bubble(pt: sqlite3.Row):
     bubble = _flex_bubble("📅 สถานะยาวันนี้", "#4f46e5", rows)
     if bubble is None:
         return None
-    return FlexMessage(alt_text=_flex_alt(_get_status_reply(pt)), contents=bubble)
+    qr = _make_quick_reply([("💊 ดูรายละเอียดยา", "ยา"), ("📊 adherence", "adherence"), ("🧪 inr", "inr")])
+    return FlexMessage(alt_text=_flex_alt(_get_status_reply(pt)), contents=bubble,
+                       quick_reply=qr)
 
 def _flex_dose_bubble(pt: sqlite3.Row):
     if not FLEX_AVAILABLE:
@@ -1512,8 +1556,18 @@ def _flex_dose_bubble(pt: sqlite3.Row):
             style="primary", color="#059669", height="sm",
             action=URIAction(label="กดยืนยันกินยา ✅", uri=f"{BASE_URL}/dose/{dose['token_id']}"),
         )
+    # Quick Reply: ปุ่มยืนยันถ้ายังไม่กิน, ปุ่มดูสถานะถ้ากินแล้ว
+    if dose["status"] == "planned" and dose["token_id"]:
+        qr = _make_quick_reply([
+            ("✅ ยืนยันกินยา", f"{BASE_URL}/dose/{dose['token_id']}"),
+            ("📊 adherence", "adherence"),
+            ("🧪 inr", "inr"),
+        ])
+    else:
+        qr = _make_quick_reply([("📅 สถานะ", "สถานะ"), ("📊 adherence", "adherence"), ("🧪 inr", "inr")])
     bubble = _flex_bubble("💊 ยาวาร์ฟาริน", "#059669", rows, footer_button=footer)
-    return FlexMessage(alt_text=_flex_alt(_get_dose_reply(pt)), contents=bubble) if bubble else None
+    return FlexMessage(alt_text=_flex_alt(_get_dose_reply(pt)), contents=bubble,
+                       quick_reply=qr) if bubble else None
 
 def _flex_adherence_bubble(pt: sqlite3.Row):
     if not FLEX_AVAILABLE:
@@ -1883,8 +1937,62 @@ def audit_page(request: Request):
     })
 
 # ---------------------------------------------------------------------------
+# LINE broadcast helpers
+# ---------------------------------------------------------------------------
+def _last_inr_out_of_range(conn, patient: dict) -> bool:
+    """คืน True ถ้า INR ล่าสุดออกนอกเป้าหมาย"""
+    row = conn.execute(
+        "SELECT in_range FROM lab_results WHERE patient_id=? ORDER BY test_date DESC LIMIT 1",
+        (patient["patient_id"],),
+    ).fetchone()
+    return bool(row and not row["in_range"])
+
+def _filter_broadcast_targets(patients: list[dict], target: str) -> list[dict]:
+    """กรองผู้ป่วยตาม target group"""
+    if target == "all":
+        return patients
+    if target == "low_adherence":
+        result = []
+        for p in patients:
+            with db() as conn:
+                adh = compute_adherence(conn, p["patient_id"], 30)
+            if adh["percent"] < 50:
+                result.append(p)
+        return result
+    if target == "missed_yesterday":
+        yesterday = (_now_dt() - timedelta(days=1)).strftime("%Y-%m-%d")
+        with db() as conn:
+            missed_pids = {r["patient_id"] for r in conn.execute(
+                "SELECT DISTINCT patient_id FROM medication_plan "
+                "WHERE scheduled_date=? AND status='missed'", (yesterday,)
+            ).fetchall()}
+        return [p for p in patients if p["patient_id"] in missed_pids]
+    if target == "high_risk":
+        result = []
+        for p in patients:
+            with db() as conn:
+                adh = compute_adherence(conn, p["patient_id"], 30)
+                out_of_range = _last_inr_out_of_range(conn, p)
+            if adh["percent"] < 50 or out_of_range:
+                result.append(p)
+        return result
+    return patients
+
+# ---------------------------------------------------------------------------
 # LINE broadcast (staff → patients)
 # ---------------------------------------------------------------------------
+@app.get("/api/broadcast-preview")
+def api_broadcast_preview(request: Request, target: str = "all"):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401)
+    with db() as conn:
+        all_pts = [dict(p) for p in conn.execute(
+            "SELECT * FROM patients WHERE active=1 AND line_user_id IS NOT NULL AND line_user_id!=''"
+        ).fetchall()]
+    pts = _filter_broadcast_targets(all_pts, target)
+    return {"target": target, "count": len(pts)}
+
 @app.post("/line/broadcast")
 async def line_broadcast(request: Request):
     user = get_current_user(request)
@@ -1892,17 +2000,19 @@ async def line_broadcast(request: Request):
         raise HTTPException(401)
     form = await request.form()
     message = form.get("message", "").strip()
+    target = form.get("target", "all")
     if not message:
         return JSONResponse({"ok": False, "error": "empty message"})
     if len(message) > 2000:
         message = message[:2000]
-    sent = 0
-    failed = 0
     with db() as conn:
-        patients = conn.execute(
-            "SELECT patient_id, line_user_id FROM patients "
+        all_pts = conn.execute(
+            "SELECT * FROM patients "
             "WHERE active=1 AND line_user_id IS NOT NULL AND line_user_id!=''"
         ).fetchall()
+    patients = _filter_broadcast_targets([dict(p) for p in all_pts], target)
+    sent = 0
+    failed = 0
     for p in patients:
         if _push_line(p["line_user_id"], message):
             sent += 1
@@ -1911,8 +2021,118 @@ async def line_broadcast(request: Request):
         with db() as conn:
             _log_notification(conn, p["patient_id"], None, "broadcast", message, True)
     with db() as conn:
-        log_audit(conn, "broadcast", "line", "all", user["username"], f"sent={sent} failed={failed}")
-    return JSONResponse({"ok": True, "sent": sent, "failed": failed})
+        log_audit(conn, "broadcast", "line", target, user["username"], f"sent={sent} failed={failed}")
+    return JSONResponse({"ok": True, "sent": sent, "failed": failed, "target": target})
+
+# ---------------------------------------------------------------------------
+# LINE Rich Menu
+# ---------------------------------------------------------------------------
+def _build_rich_menu_image() -> bytes:
+    """สร้างภาพ Rich Menu 1200×810 px ด้วย Pillow — 2 แถว × 3 คอลัมน์"""
+    from PIL import Image, ImageDraw, ImageFont
+    W, H = 1200, 810
+    CELLS = [
+        (0,   0,   "สถานะ",     "📅", "#4f46e5"),
+        (400, 0,   "ยา",        "💊", "#059669"),
+        (800, 0,   "adherence", "📊", "#0891b2"),
+        (0,   405, "inr",       "🧪", "#9333ea"),
+        (400, 405, "ความรู้",   "📚", "#f59e0b"),
+        (800, 405, "อาการ",     "📝", "#e11d48"),
+    ]
+    img = Image.new("RGB", (W, H), "#f1f5f9")
+    draw = ImageDraw.Draw(img)
+    try:
+        font_emoji = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48)
+        font_label = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
+    except Exception:
+        font_emoji = ImageFont.load_default(size=48) if hasattr(ImageFont, "load_default") else ImageFont.load_default()
+        font_label = font_emoji
+    for cx, cy, label, emoji, color in CELLS:
+        # พื้นหลังช่อง
+        draw.rectangle([cx + 6, cy + 6, cx + 394, cy + 399], fill=color, outline=None)
+        # emoji ตรงกลางบน
+        draw.text((cx + 197, cy + 140), emoji, anchor="mm", font=font_emoji, fill="white")
+        # label ตรงกลางล่าง
+        draw.text((cx + 197, cy + 260), label, anchor="mm", font=font_label, fill="white")
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    buf.seek(0)
+    return buf.getvalue()
+
+def _create_rich_menu() -> None:
+    """สร้าง LINE Rich Menu และตั้งเป็น default — ข้ามถ้า SDK ไม่พร้อมหรือไม่มี token"""
+    global _rich_menu_id
+    if not (LINE_SDK_AVAILABLE and BLOB_AVAILABLE and QR_LINE_AVAILABLE):
+        return
+    if not (line_api and LINE_CHANNEL_ACCESS_TOKEN):
+        return
+    if _rich_menu_id:
+        return  # ใช้ id เดิม ไม่ recreate
+    if not QR_AVAILABLE:  # Pillow ต้องพร้อมสำหรับสร้างภาพ
+        return
+    try:
+        rich_menu = RichMenuRequest(
+            size=RichMenuSize(width=1200, height=810),
+            selected=True,
+            name="Warfarin Menu",
+            chat_bar_text="เมนู",
+            areas=[
+                RichMenuArea(
+                    bounds=RichMenuBounds(x=0,   y=0,   width=400, height=405),
+                    action=LineMessageAction(label="สถานะ",    text="สถานะ"),
+                ),
+                RichMenuArea(
+                    bounds=RichMenuBounds(x=400, y=0,   width=400, height=405),
+                    action=LineMessageAction(label="ยา",       text="ยา"),
+                ),
+                RichMenuArea(
+                    bounds=RichMenuBounds(x=800, y=0,   width=400, height=405),
+                    action=LineMessageAction(label="adherence",text="adherence"),
+                ),
+                RichMenuArea(
+                    bounds=RichMenuBounds(x=0,   y=405, width=400, height=405),
+                    action=LineMessageAction(label="inr",      text="inr"),
+                ),
+                RichMenuArea(
+                    bounds=RichMenuBounds(x=400, y=405, width=400, height=405),
+                    action=LineMessageAction(label="ความรู้",  text="ความรู้"),
+                ),
+                RichMenuArea(
+                    bounds=RichMenuBounds(x=800, y=405, width=400, height=405),
+                    action=LineMessageAction(label="อาการ",    text="อาการ"),
+                ),
+            ],
+        )
+        response = line_api.create_rich_menu(rich_menu_request=rich_menu)
+        menu_id = response.rich_menu_id
+        img_bytes = _build_rich_menu_image()
+        blob_client = MessagingApiBlob(ApiClient(
+            Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
+        ))
+        blob_client.set_rich_menu_image(
+            rich_menu_id=menu_id,
+            body=img_bytes,
+            _headers={"Content-Type": "image/png"},
+        )
+        line_api.set_default_rich_menu(rich_menu_id=menu_id)
+        _rich_menu_id = menu_id
+        print(f"[INFO] Rich menu created: {menu_id}")
+    except Exception as e:
+        print(f"[WARN] Rich menu creation failed: {e}")
+
+@app.post("/line/rich-menu/refresh")
+async def refresh_rich_menu(request: Request):
+    """Force-recreate LINE Rich Menu (admin)"""
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403)
+    global _rich_menu_id
+    _rich_menu_id = None  # reset cache
+    try:
+        _create_rich_menu()
+        return JSONResponse({"ok": True, "rich_menu_id": _rich_menu_id})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
 
 # ---------------------------------------------------------------------------
 # Pill inventory

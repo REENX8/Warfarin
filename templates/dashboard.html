@@ -106,9 +106,20 @@
     <!-- Broadcast modal -->
     <div id="broadcastModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <h3 class="text-lg font-bold text-slate-800 mb-3">ส่งข้อความ LINE ถึงผู้ป่วยทุกคน</h3>
-            <p class="text-xs text-slate-500 mb-3">ข้อความจะถูกส่งถึงผู้ป่วยที่เชื่อมต่อ LINE ({{ line_linked }} คน)</p>
-            <textarea id="broadcastText" rows="5" placeholder="พิมพ์ข้อความที่นี่..." class="w-full rounded-lg border border-slate-300 text-sm p-3 focus:ring-2 focus:ring-emerald-500"></textarea>
+            <h3 class="text-lg font-bold text-slate-800 mb-1">ส่งข้อความ LINE</h3>
+            <p class="text-xs text-slate-500 mb-4">เลือกกลุ่มเป้าหมายแล้วพิมพ์ข้อความ</p>
+            <!-- Target selector -->
+            <div class="mb-3">
+                <label class="block text-xs font-medium text-slate-600 mb-1">กลุ่มเป้าหมาย</label>
+                <select id="broadcastTarget" onchange="updatePreview()" class="w-full rounded-lg border border-slate-300 text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+                    <option value="all">ทุกคนที่เชื่อม LINE ({{ line_linked }} คน)</option>
+                    <option value="low_adherence">Adherence &lt; 50% (30 วัน)</option>
+                    <option value="missed_yesterday">พลาดยาเมื่อวาน</option>
+                    <option value="high_risk">กลุ่มเสี่ยง (adherence ต่ำ หรือ INR นอกเป้า)</option>
+                </select>
+                <p id="broadcastPreview" class="text-xs text-indigo-600 mt-1 h-4"></p>
+            </div>
+            <textarea id="broadcastText" rows="4" placeholder="พิมพ์ข้อความที่นี่..." class="w-full rounded-lg border border-slate-300 text-sm p-3 focus:ring-2 focus:ring-emerald-500"></textarea>
             <div class="flex gap-2 mt-4">
                 <button onclick="sendBroadcast()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg">ส่ง</button>
                 <button onclick="document.getElementById('broadcastModal').classList.add('hidden')" class="px-4 py-2 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50">ยกเลิก</button>
@@ -206,15 +217,32 @@
 </div>
 
 <script>
+async function updatePreview() {
+    const target = document.getElementById('broadcastTarget').value;
+    const preview = document.getElementById('broadcastPreview');
+    try {
+        const r = await fetch(`/api/broadcast-preview?target=${target}`);
+        const j = await r.json();
+        preview.textContent = `จะส่งถึง ${j.count} คน`;
+    } catch { preview.textContent = ''; }
+}
+// แสดง preview ครั้งแรกเมื่อ modal เปิด
+document.getElementById('broadcastModal').addEventListener('transitionend', () => {
+    if (!document.getElementById('broadcastModal').classList.contains('hidden')) updatePreview();
+});
+
 async function sendBroadcast() {
     const text = document.getElementById('broadcastText').value.trim();
+    const target = document.getElementById('broadcastTarget').value;
     const resultEl = document.getElementById('broadcastResult');
     if (!text) { resultEl.textContent = 'กรุณาพิมพ์ข้อความก่อน'; resultEl.className='text-xs mt-2 text-rose-600'; return; }
-    if (!confirm('ยืนยันการส่งข้อความถึงผู้ป่วยทุกคน?')) return;
+    const preview = document.getElementById('broadcastPreview').textContent;
+    if (!confirm(`ยืนยันส่งข้อความ: ${preview}?`)) return;
     resultEl.textContent = 'กำลังส่ง...';
     resultEl.className = 'text-xs mt-2 text-slate-500';
     const fd = new FormData();
     fd.append('message', text);
+    fd.append('target', target);
     try {
         const r = await fetch('/line/broadcast', { method: 'POST', body: fd });
         const j = await r.json();

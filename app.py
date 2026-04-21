@@ -2027,33 +2027,73 @@ async def line_broadcast(request: Request):
 # ---------------------------------------------------------------------------
 # LINE Rich Menu
 # ---------------------------------------------------------------------------
+def _draw_menu_icon(draw, cx, cy, icon_key):
+    """วาด icon เรขาคณิตสีขาวตรงกลางช่อง Rich Menu"""
+    mx, my = cx + 197, cy + 150
+    w = 3
+    if icon_key == "สถานะ":
+        draw.rounded_rectangle([mx-30, my-35, mx+30, my+35], radius=6, outline="white", width=w)
+        for dy in (-15, 0, 15):
+            draw.line([mx-18, my+dy, mx+18, my+dy], fill="white", width=2)
+        draw.rectangle([mx-30, my-35, mx+30, my-22], fill="white")
+    elif icon_key == "ยา":
+        draw.rounded_rectangle([mx-32, my-14, mx+32, my+14], radius=14, outline="white", width=w, fill=None)
+        draw.line([mx, my-14, mx, my+14], fill="white", width=w)
+        draw.rounded_rectangle([mx, my-14, mx+32, my+14], radius=14, fill="white")
+    elif icon_key == "adherence":
+        bw, gap = 14, 6
+        x0 = mx - int(1.5 * bw + gap)
+        for i, h in enumerate([40, 55, 30]):
+            bx = x0 + i * (bw + gap)
+            draw.rectangle([bx, my + 28 - h, bx + bw, my + 28], fill="white")
+        draw.line([x0 - 4, my + 30, x0 + 3 * (bw + gap), my + 30], fill="white", width=2)
+    elif icon_key == "inr":
+        draw.ellipse([mx-28, my-28, mx+28, my+28], outline="white", width=w)
+        draw.ellipse([mx-10, my-10, mx+10, my+10], fill="white")
+        draw.line([mx+20, my+20, mx+36, my+36], fill="white", width=w)
+    elif icon_key == "ความรู้":
+        draw.polygon([(mx-30, my-20), (mx-4, my-8), (mx-4, my+28), (mx-30, my+16)], outline="white", fill=None)
+        draw.polygon([(mx+30, my-20), (mx+4, my-8), (mx+4, my+28), (mx+30, my+16)], outline="white", fill=None)
+        draw.line([mx-30, my-20, mx-4, my-8], fill="white", width=w)
+        draw.line([mx+30, my-20, mx+4, my-8], fill="white", width=w)
+    elif icon_key == "อาการ":
+        draw.rounded_rectangle([mx-22, my-30, mx+22, my+34], radius=4, outline="white", width=w)
+        draw.line([mx-22, my-18, mx+22, my-18], fill="white", width=w)
+        for dy in (-4, 8, 20):
+            draw.line([mx-14, my+dy, mx+14, my+dy], fill="white", width=2)
+
 def _build_rich_menu_image() -> bytes:
     """สร้างภาพ Rich Menu 1200×810 px ด้วย Pillow — 2 แถว × 3 คอลัมน์"""
     from PIL import Image, ImageDraw, ImageFont
     W, H = 1200, 810
     CELLS = [
-        (0,   0,   "สถานะ",     "📅", "#4f46e5"),
-        (400, 0,   "ยา",        "💊", "#059669"),
-        (800, 0,   "adherence", "📊", "#0891b2"),
-        (0,   405, "inr",       "🧪", "#9333ea"),
-        (400, 405, "ความรู้",   "📚", "#f59e0b"),
-        (800, 405, "อาการ",     "📝", "#e11d48"),
+        (0,   0,   "สถานะ",     "#4f46e5"),
+        (400, 0,   "ยา",        "#059669"),
+        (800, 0,   "adherence", "#0891b2"),
+        (0,   405, "inr",       "#9333ea"),
+        (400, 405, "ความรู้",   "#f59e0b"),
+        (800, 405, "อาการ",     "#e11d48"),
     ]
     img = Image.new("RGB", (W, H), "#f1f5f9")
     draw = ImageDraw.Draw(img)
-    try:
-        font_emoji = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48)
-        font_label = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
-    except Exception:
-        font_emoji = ImageFont.load_default(size=48) if hasattr(ImageFont, "load_default") else ImageFont.load_default()
-        font_label = font_emoji
-    for cx, cy, label, emoji, color in CELLS:
-        # พื้นหลังช่อง
+    _FONT_PATHS = [
+        "/usr/share/fonts/opentype/tlwg/Loma-Bold.otf",
+        "/usr/share/fonts/opentype/tlwg/Loma.otf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ]
+    font_label = None
+    for fp in _FONT_PATHS:
+        try:
+            font_label = ImageFont.truetype(fp, 36)
+            break
+        except Exception:
+            continue
+    if font_label is None:
+        font_label = ImageFont.load_default(size=36) if hasattr(ImageFont, "load_default") else ImageFont.load_default()
+    for cx, cy, label, color in CELLS:
         draw.rectangle([cx + 6, cy + 6, cx + 394, cy + 399], fill=color, outline=None)
-        # emoji ตรงกลางบน
-        draw.text((cx + 197, cy + 140), emoji, anchor="mm", font=font_emoji, fill="white")
-        # label ตรงกลางล่าง
-        draw.text((cx + 197, cy + 260), label, anchor="mm", font=font_label, fill="white")
+        _draw_menu_icon(draw, cx, cy, label)
+        draw.text((cx + 197, cy + 280), label, anchor="mm", font=font_label, fill="white")
     buf = io.BytesIO()
     img.save(buf, "PNG")
     buf.seek(0)

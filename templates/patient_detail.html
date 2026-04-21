@@ -8,15 +8,29 @@
             <h1 class="text-2xl font-bold text-slate-800 mt-1">{{ patient.full_name }}</h1>
             <p class="text-sm text-slate-500">HN: {{ patient.hn or '-' }} | อายุ: {{ patient.age_years or '-' }} ปี | น้ำหนัก: {{ patient.weight_kg or '-' }} kg</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
+            <a href="/patients/{{ patient.patient_id }}/qr-sheet" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 transition-colors">
+                📱 QR Sheet
+            </a>
             <a href="/patients/{{ patient.patient_id }}/survey" class="inline-flex items-center gap-2 px-4 py-2 bg-violet-50 border border-violet-200 text-violet-700 text-sm font-medium rounded-lg hover:bg-violet-100 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                แบบสอบถาม
+                📋 แบบสอบถาม
             </a>
             <a href="/patients/{{ patient.patient_id }}/edit" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                แก้ไข
+                ✏️ แก้ไข
             </a>
+            {% if patient.active %}
+            <form method="POST" action="/patients/{{ patient.patient_id }}/delete" onsubmit="return confirm('ยืนยันการปิดบัญชีผู้ป่วย?');" class="inline">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium rounded-lg hover:bg-rose-100 transition-colors">
+                    🗄️ ปิดบัญชี
+                </button>
+            </form>
+            {% else %}
+            <form method="POST" action="/patients/{{ patient.patient_id }}/reactivate" class="inline">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium rounded-lg hover:bg-emerald-100 transition-colors">
+                    ♻️ เปิดใช้งานอีกครั้ง
+                </button>
+            </form>
+            {% endif %}
         </div>
     </div>
 
@@ -36,7 +50,7 @@
     </div>
 
     <!-- Score cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
             <p class="text-xs font-medium text-slate-500">Adherence 7 วัน</p>
             <p class="text-2xl font-bold mt-1 {% if adh7.percent >= 80 %}text-emerald-600{% elif adh7.percent >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ adh7.percent }}%</p>
@@ -54,7 +68,35 @@
             <p class="text-2xl font-bold text-slate-700 mt-1">{{ adh30.percent }}%</p>
             <p class="text-xs text-slate-400">กิน {{ adh30.taken }} / พลาด {{ adh30.missed }}</p>
         </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
+            <p class="text-xs font-medium text-slate-500">TTR</p>
+            <p class="text-2xl font-bold {% if ttr and ttr >= 65 %}text-emerald-600{% elif ttr %}text-amber-600{% else %}text-slate-400{% endif %} mt-1">
+                {% if ttr is not none %}{{ ttr }}%{% else %}—{% endif %}
+            </p>
+            <p class="text-xs text-slate-400">Time in Range</p>
+        </div>
     </div>
+
+    <!-- Today's dose QR -->
+    {% if today_dose and today_dose.token_id %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <div class="flex flex-col sm:flex-row items-center gap-5">
+            <img src="/qr/{{ today_dose.token_id }}.png" alt="QR" class="w-32 h-32 rounded-lg border border-slate-200">
+            <div class="flex-1 text-center sm:text-left">
+                <p class="text-xs font-medium text-indigo-600 uppercase">โดสวันนี้</p>
+                <p class="text-2xl font-bold text-slate-800 mt-1">{{ today_dose.warfarin_mg }} mg</p>
+                <p class="text-sm text-slate-500">เวลา {{ today_dose.scheduled_time }} น. — {{ today_dose.pill_description or 'ยาวาร์ฟาริน' }}</p>
+                <p class="text-xs text-slate-400 mt-1">สถานะ:
+                    {% if today_dose.status == 'taken' %}<span class="text-emerald-600">กินแล้ว ✅</span>
+                    {% elif today_dose.status == 'late' %}<span class="text-amber-600">กินแล้ว (ช้า) ⏰</span>
+                    {% elif today_dose.status == 'missed' %}<span class="text-rose-600">พลาด ❌</span>
+                    {% else %}<span class="text-slate-600">ยังไม่ยืนยัน 🕐</span>{% endif %}
+                </p>
+                <a href="/dose/{{ today_dose.token_id }}" target="_blank" class="inline-block mt-2 text-xs text-indigo-600 hover:text-indigo-800 font-medium">เปิดลิงก์ยืนยัน →</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Dose Management -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-200">
@@ -111,6 +153,7 @@
                     <th class="px-4 py-2.5 text-left hidden sm:table-cell">ลักษณะยา</th>
                     <th class="px-4 py-2.5 text-center">สถานะ</th>
                     <th class="px-4 py-2.5 text-center hidden sm:table-cell">ยืนยัน</th>
+                    <th class="px-4 py-2.5 text-right">จัดการ</th>
                 </tr></thead>
                 <tbody class="divide-y divide-slate-100">
                     {% for d in doses %}
@@ -126,9 +169,21 @@
                             {% else %}<span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">รอ</span>{% endif %}
                         </td>
                         <td class="px-4 py-2.5 text-xs text-slate-400 text-center hidden sm:table-cell">{{ d.confirmed_at[:16] if d.confirmed_at else '-' }}</td>
+                        <td class="px-4 py-2.5 text-right text-xs whitespace-nowrap">
+                            {% if d.token_id %}<a href="/dose/{{ d.token_id }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 mr-2">ลิงก์</a>{% endif %}
+                            <form method="POST" action="/doses/{{ d.dose_id }}/override" class="inline">
+                                <select name="status" onchange="if(confirm('เปลี่ยนสถานะโดยเจ้าหน้าที่?'))this.form.submit(); else this.selectedIndex=0;" class="text-xs border rounded px-1 py-0.5 text-slate-500">
+                                    <option value="">⚙️</option>
+                                    <option value="taken">→ กินแล้ว</option>
+                                    <option value="late">→ สาย</option>
+                                    <option value="missed">→ พลาด</option>
+                                    <option value="planned">→ รอ</option>
+                                </select>
+                            </form>
+                        </td>
                     </tr>
                     {% endfor %}
-                    {% if not doses %}<tr><td colspan="6" class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีแผนยา</td></tr>{% endif %}
+                    {% if not doses %}<tr><td colspan="7" class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีแผนยา</td></tr>{% endif %}
                 </tbody>
             </table>
         </div>
@@ -178,6 +233,23 @@
         {% endif %}
     </div>
 
+    <!-- Adherence Heatmap (90 วัน) -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">ภาพรวมการกินยา 90 วัน</h2>
+            <div class="flex items-center gap-3 text-xs text-slate-500">
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-emerald-500"></span> กินแล้ว</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-rose-500"></span> พลาด</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-slate-300"></span> รอ</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-slate-100 border border-slate-200"></span> ไม่มี</span>
+            </div>
+        </div>
+        <div class="p-6">
+            <div id="heatmap" class="grid grid-rows-7 grid-flow-col gap-1 w-fit" style="grid-template-rows: repeat(7, minmax(0, 1fr));"></div>
+            <p id="heatmapEmpty" class="hidden text-center text-sm text-slate-400 py-8">ยังไม่มีข้อมูล</p>
+        </div>
+    </div>
+
     <!-- Test Scores -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-200">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -217,6 +289,34 @@
         <div class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีผลแบบทดสอบ</div>
         {% endif %}
     </div>
+
+    <!-- Symptom reports -->
+    {% if symptoms %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-100">
+            <h2 class="text-base font-semibold text-slate-800">รายงานอาการ (10 รายการล่าสุด)</h2>
+        </div>
+        <div class="divide-y divide-slate-100">
+            {% for s in symptoms %}
+            <div class="px-6 py-3 flex items-center gap-3">
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold
+                    {% if s.severity >= 4 %}bg-rose-100 text-rose-700
+                    {% elif s.severity == 3 %}bg-amber-100 text-amber-700
+                    {% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ s.severity }}/5</span>
+                <div class="flex-1 text-xs text-slate-600 space-x-1">
+                    {% if s.bleeding %}<span class="inline-block bg-rose-50 text-rose-700 rounded px-2 py-0.5">เลือดออก</span>{% endif %}
+                    {% if s.bruising %}<span class="inline-block bg-purple-50 text-purple-700 rounded px-2 py-0.5">ช้ำ</span>{% endif %}
+                    {% if s.headache %}<span class="inline-block bg-amber-50 text-amber-700 rounded px-2 py-0.5">ปวดหัว</span>{% endif %}
+                    {% if s.dizziness %}<span class="inline-block bg-sky-50 text-sky-700 rounded px-2 py-0.5">เวียนหัว</span>{% endif %}
+                    {% if s.nausea %}<span class="inline-block bg-lime-50 text-lime-700 rounded px-2 py-0.5">คลื่นไส้</span>{% endif %}
+                    {% if s.other %}<span class="text-slate-500">— {{ s.other }}</span>{% endif %}
+                </div>
+                <span class="text-xs text-slate-400">{{ s.created_at[:16] if s.created_at else s.report_date }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Satisfaction Survey Results -->
     {% if surveys %}
@@ -307,5 +407,35 @@ fetch('/api/patients/{{ patient.patient_id }}/inr-data')
             }]
         });
     });
+
+// 90-day adherence heatmap
+fetch('/api/patients/{{ patient.patient_id }}/heatmap-data')
+    .then(r => r.json())
+    .then(data => {
+        const grid = document.getElementById('heatmap');
+        const empty = document.getElementById('heatmapEmpty');
+        if (!grid) return;
+        if (!data || !data.length) { grid.classList.add('hidden'); empty.classList.remove('hidden'); return; }
+        const colorMap = {
+            taken: 'bg-emerald-500',
+            late: 'bg-emerald-400',
+            missed: 'bg-rose-500',
+            planned: 'bg-slate-300',
+            none: 'bg-slate-100 border border-slate-200',
+        };
+        const labelMap = {
+            taken: 'กินแล้ว', late: 'กินแล้ว (ช้า)',
+            missed: 'พลาด', planned: 'รอกิน', none: 'ไม่มีโดส',
+        };
+        // arrange by week column (7 rows) — first day of grid is start day-of-week aligned
+        data.forEach(d => {
+            const cell = document.createElement('div');
+            cell.className = 'w-4 h-4 rounded-sm ' + (colorMap[d.status] || colorMap.none);
+            cell.title = `${d.date} — ${labelMap[d.status] || d.status}` +
+                (d.total ? ` (${d.taken}/${d.total})` : '');
+            grid.appendChild(cell);
+        });
+    })
+    .catch(() => {});
 </script>
 {% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}ประวัติการแจ้งเตือน{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-800">ประวัติการแจ้งเตือน LINE</h1>
+        <p class="text-sm text-slate-500 mt-1">ข้อความทั้งหมดที่ระบบส่งถึงผู้ป่วย (200 รายการล่าสุด)</p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-slate-50">
+                    <tr class="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left">เวลา</th>
+                        <th class="px-4 py-3 text-left">ผู้ป่วย</th>
+                        <th class="px-4 py-3 text-left">ประเภท</th>
+                        <th class="px-4 py-3 text-left">ข้อความ</th>
+                        <th class="px-4 py-3 text-center">ส่ง</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for l in logs %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{{ l.sent_at[:16] if l.sent_at else '-' }}</td>
+                        <td class="px-4 py-3 text-sm">
+                            {% if l.patient_id %}
+                            <a href="/patients/{{ l.patient_id }}" class="font-medium text-indigo-600 hover:text-indigo-800">{{ l.full_name or 'N/A' }}</a>
+                            {% else %}<span class="text-slate-400">—</span>{% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                                {% if l.message_type == 'missed' %}bg-rose-50 text-rose-700
+                                {% elif l.message_type == 'broadcast' %}bg-violet-50 text-violet-700
+                                {% elif l.message_type and l.message_type.startswith('reminder') %}bg-indigo-50 text-indigo-700
+                                {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                {{ l.message_type or 'other' }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-600 max-w-md truncate">{{ l.message_text or '-' }}</td>
+                        <td class="px-4 py-3 text-center text-sm">
+                            {% if l.delivered %}<span class="text-emerald-600">✅</span>{% else %}<span class="text-rose-500">❌</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not logs %}
+                    <tr><td colspan="5" class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีการแจ้งเตือน</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -23,6 +23,7 @@
                 <div class="text-center">
                     <p class="text-sm text-slate-500">ผู้ป่วย</p>
                     <p class="text-lg font-bold text-slate-800">{{ token.full_name }}</p>
+                    {% if token.hn %}<p class="text-xs text-slate-400">HN: {{ token.hn }}</p>{% endif %}
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -47,11 +48,16 @@
                     <p class="text-xs text-amber-500 mt-1">สม่ำเสมอ {{ adherence.percent }}% | ต่อเนื่อง {{ streak }} วัน</p>
                 </div>
 
-                {% if already %}
+                {% if expired %}
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+                    <p class="text-slate-700 font-semibold">⏱️ ลิงก์ยืนยันหมดอายุแล้ว</p>
+                    <p class="text-xs text-slate-500 mt-1">กรุณาติดต่อเภสัชกรเพื่อบันทึกด้วยมือ</p>
+                </div>
+                {% elif already %}
                 <!-- Already confirmed -->
-                <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center">
-                    <p class="text-rose-600 font-semibold">⚠️ โดสนี้ถูกยืนยันไปแล้ว</p>
-                    <p class="text-xs text-rose-500 mt-1">หากยังไม่ได้กินยา กรุณาติดต่อเจ้าหน้าที่</p>
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+                    <p class="text-emerald-700 font-semibold">✅ ยืนยันไปแล้ว</p>
+                    <p class="text-xs text-emerald-600 mt-1">ขอบคุณที่ดูแลสุขภาพค่ะ</p>
                 </div>
                 {% else %}
                 <!-- Confirm form -->
@@ -64,11 +70,25 @@
                             <option value="staff">เจ้าหน้าที่</option>
                         </select>
                     </div>
-                    <button type="submit" class="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-white text-base font-bold rounded-xl shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">
+                    <button type="submit" onclick="this.disabled=true;this.form.submit();" class="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-white text-base font-bold rounded-xl shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-60">
                         ✅ ยืนยันว่ากินยาแล้ว
                     </button>
                 </form>
+
+                <details class="text-center">
+                    <summary class="text-xs text-slate-400 cursor-pointer hover:text-indigo-600">แสดง QR code</summary>
+                    <div class="mt-3 flex justify-center">
+                        <img src="/qr/{{ token.token_id }}.png" alt="QR Code" class="w-40 h-40 rounded-lg border border-slate-200">
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2">ให้เจ้าหน้าที่สแกนเพื่อยืนยัน</p>
+                </details>
                 {% endif %}
+
+                <div class="pt-2 border-t border-slate-100">
+                    <a href="/report/symptom/{{ token.pid }}" class="block text-center text-xs text-rose-600 hover:text-rose-800 font-medium">
+                        📝 รายงานอาการไม่พึงประสงค์
+                    </a>
+                </div>
             </div>
         </div>
 

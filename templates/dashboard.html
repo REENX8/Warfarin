@@ -2,9 +2,20 @@
 {% block title %}แดชบอร์ด{% endblock %}
 {% block content %}
 <div class="space-y-6">
-    <div>
-        <h1 class="text-2xl font-bold text-slate-800">แดชบอร์ด</h1>
-        <p class="text-sm text-slate-500 mt-1">ภาพรวมการติดตามผู้ป่วยวาร์ฟารินวันนี้</p>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">แดชบอร์ด</h1>
+            <p class="text-sm text-slate-500 mt-1">ภาพรวมการติดตามผู้ป่วยวาร์ฟารินวันนี้</p>
+        </div>
+        <div class="flex items-center gap-2">
+            {% if line_configured %}
+            <button onclick="document.getElementById('broadcastModal').classList.remove('hidden')" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors">
+                📢 ส่ง LINE ทุกคน
+            </button>
+            {% else %}
+            <span class="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">⚠️ LINE ยังไม่ตั้งค่า</span>
+            {% endif %}
+        </div>
     </div>
 
     <!-- Stat Cards -->
@@ -52,6 +63,68 @@
                     <svg class="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Secondary stats row -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+            <p class="text-xs font-medium text-slate-500">Adherence เฉลี่ย 7 วัน</p>
+            <p class="text-xl font-bold mt-1 {% if adherence_avg >= 80 %}text-emerald-600{% elif adherence_avg >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ adherence_avg }}%</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+            <p class="text-xs font-medium text-slate-500">เชื่อม LINE แล้ว</p>
+            <p class="text-xl font-bold text-indigo-600 mt-1">{{ line_linked }}/{{ active_patients }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+            <p class="text-xs font-medium text-slate-500">ผู้ป่วยเสี่ยง</p>
+            <p class="text-xl font-bold text-rose-600 mt-1">{{ at_risk_patients|length }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+            <p class="text-xs font-medium text-slate-500">อาการรุนแรง 7 วัน</p>
+            <p class="text-xl font-bold text-amber-600 mt-1">{{ urgent_symptoms|length }}</p>
+        </div>
+    </div>
+
+    <!-- Urgent symptoms banner -->
+    {% if urgent_symptoms %}
+    <div class="bg-rose-50 border border-rose-200 rounded-xl p-4">
+        <h3 class="text-sm font-semibold text-rose-800 mb-2 flex items-center gap-2">
+            <span>🚨</span> รายงานอาการที่ต้องตรวจสอบ
+        </h3>
+        <div class="space-y-1">
+            {% for s in urgent_symptoms %}
+            <a href="/patients/{{ s.patient_id }}" class="block text-xs text-rose-700 hover:text-rose-900">
+                • {{ s.full_name }} — ระดับ {{ s.severity }}/5 — {{ s.created_at[:16] if s.created_at else s.report_date }}
+                {% if s.bleeding %}(เลือดออก){% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Broadcast modal -->
+    <div id="broadcastModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-1">ส่งข้อความ LINE</h3>
+            <p class="text-xs text-slate-500 mb-4">เลือกกลุ่มเป้าหมายแล้วพิมพ์ข้อความ</p>
+            <!-- Target selector -->
+            <div class="mb-3">
+                <label class="block text-xs font-medium text-slate-600 mb-1">กลุ่มเป้าหมาย</label>
+                <select id="broadcastTarget" onchange="updatePreview()" class="w-full rounded-lg border border-slate-300 text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+                    <option value="all">ทุกคนที่เชื่อม LINE ({{ line_linked }} คน)</option>
+                    <option value="low_adherence">Adherence &lt; 50% (30 วัน)</option>
+                    <option value="missed_yesterday">พลาดยาเมื่อวาน</option>
+                    <option value="high_risk">กลุ่มเสี่ยง (adherence ต่ำ หรือ INR นอกเป้า)</option>
+                </select>
+                <p id="broadcastPreview" class="text-xs text-indigo-600 mt-1 h-4"></p>
+            </div>
+            <textarea id="broadcastText" rows="4" placeholder="พิมพ์ข้อความที่นี่..." class="w-full rounded-lg border border-slate-300 text-sm p-3 focus:ring-2 focus:ring-emerald-500"></textarea>
+            <div class="flex gap-2 mt-4">
+                <button onclick="sendBroadcast()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg">ส่ง</button>
+                <button onclick="document.getElementById('broadcastModal').classList.add('hidden')" class="px-4 py-2 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50">ยกเลิก</button>
+            </div>
+            <p id="broadcastResult" class="text-xs mt-2"></p>
         </div>
     </div>
 
@@ -142,4 +215,50 @@
         </div>
     </div>
 </div>
+
+<script>
+async function updatePreview() {
+    const target = document.getElementById('broadcastTarget').value;
+    const preview = document.getElementById('broadcastPreview');
+    try {
+        const r = await fetch(`/api/broadcast-preview?target=${target}`);
+        const j = await r.json();
+        preview.textContent = `จะส่งถึง ${j.count} คน`;
+    } catch { preview.textContent = ''; }
+}
+// แสดง preview ครั้งแรกเมื่อ modal เปิด
+document.getElementById('broadcastModal').addEventListener('transitionend', () => {
+    if (!document.getElementById('broadcastModal').classList.contains('hidden')) updatePreview();
+});
+
+async function sendBroadcast() {
+    const text = document.getElementById('broadcastText').value.trim();
+    const target = document.getElementById('broadcastTarget').value;
+    const resultEl = document.getElementById('broadcastResult');
+    if (!text) { resultEl.textContent = 'กรุณาพิมพ์ข้อความก่อน'; resultEl.className='text-xs mt-2 text-rose-600'; return; }
+    const preview = document.getElementById('broadcastPreview').textContent;
+    if (!confirm(`ยืนยันส่งข้อความ: ${preview}?`)) return;
+    resultEl.textContent = 'กำลังส่ง...';
+    resultEl.className = 'text-xs mt-2 text-slate-500';
+    const fd = new FormData();
+    fd.append('message', text);
+    fd.append('target', target);
+    try {
+        const r = await fetch('/line/broadcast', { method: 'POST', body: fd });
+        const j = await r.json();
+        if (j.ok) {
+            resultEl.textContent = `✅ ส่งสำเร็จ ${j.sent} ราย, ล้มเหลว ${j.failed} ราย`;
+            resultEl.className = 'text-xs mt-2 text-emerald-600';
+            document.getElementById('broadcastText').value = '';
+            setTimeout(() => document.getElementById('broadcastModal').classList.add('hidden'), 2000);
+        } else {
+            resultEl.textContent = '❌ ' + (j.error || 'error');
+            resultEl.className = 'text-xs mt-2 text-rose-600';
+        }
+    } catch (e) {
+        resultEl.textContent = '❌ ' + e.message;
+        resultEl.className = 'text-xs mt-2 text-rose-600';
+    }
+}
+</script>
 {% endblock %}

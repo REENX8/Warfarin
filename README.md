@@ -8,17 +8,24 @@
 
 ## คุณสมบัติหลัก
 
-- **Dashboard** — ภาพรวมรายวัน: กินแล้ว / ยังไม่กิน / พลาด / ผู้ป่วยเสี่ยง
-- **จัดการผู้ป่วย** — เพิ่ม / แก้ไข / ค้นหา พร้อมข้อมูลผู้ดูแล
-- **แผนการกินยา** — สร้างแบบ bulk รองรับขนาดยาต่างกันตามวัน (จ-อา)
-- **QR Code ยืนยันยา** — ผู้ป่วยสแกนหรือกดลิงก์บน LINE เพื่อยืนยัน
-- **LINE OA Integration** — แจ้งเตือน 18:00, เตือนซ้ำ 19:30, mark missed 21:00
-- **INR Tracking** — บันทึกผล Lab พร้อมกราฟ Chart.js และ target range zone
-- **Adherence & Streak** — คำนวณ % การกินยา 7 / 30 / 365 วัน และวันติดต่อกัน
+- **Dashboard** — ภาพรวมรายวัน: กินแล้ว / ยังไม่กิน / พลาด / ผู้ป่วยเสี่ยง / อาการรุนแรง / LINE connected
+- **จัดการผู้ป่วย** — เพิ่ม / แก้ไข / ค้นหา / ปิดบัญชี (soft delete) / เปิดใช้งานใหม่
+- **แผนการกินยา** — สร้างแบบ bulk รองรับขนาดยาต่างกันตามวัน (จ-อา) + staff override สถานะโดส
+- **QR Code ยืนยันยา** — สร้างเป็น PNG จริง, พิมพ์เป็น QR sheet ได้, ตรวจ expires_at
+- **LINE OA Integration** — verify signature (HMAC-SHA256), webhook handler, push retry
+- **LINE Auto-linking** — ผู้ป่วยพิมพ์ `ลงทะเบียน <HN>` เพื่อเชื่อมบัญชี LINE ด้วยตัวเอง
+- **LINE Commands** — `สถานะ`, `ยา`, `adherence`, `inr`, `streak`, `อาการ`, `help`
+- **LINE Broadcast** — ส่งข้อความถึงผู้ป่วยทั้งหมดจาก dashboard
+- **Scheduled Reminders** — 18:00, 19:30 (เตือนซ้ำ), 21:00 (mark missed + แจ้งผู้ดูแล)
+- **INR Tracking + TTR** — บันทึก Lab, กราฟ Chart.js, Time in Therapeutic Range (Rosendaal)
+- **Adherence & Streak** — คำนวณ % การกินยา 7 / 30 / 365 วัน และวันติดต่อกัน (group by day)
 - **Gamification Score** — คะแนนรวม (adherence + streak bonus)
+- **Symptom Reporting** — ผู้ป่วยรายงานอาการไม่พึงประสงค์ผ่าน mobile form, auto escalate ≥4/5
 - **Pre/Post Test Score** — บันทึกผลแบบทดสอบความรู้ผู้ป่วย
 - **แบบสอบถามความพึงพอใจ** — 3 มิติ พร้อมสรุปค่าเฉลี่ยในรายงาน
-- **รายงาน + Export CSV** — สรุปทุกผู้ป่วย ดาวน์โหลดเป็น CSV
+- **Notification Log** — ประวัติการแจ้งเตือน LINE ทั้งหมด + delivered flag
+- **Audit Log** — บันทึกการกระทำในระบบ (admin only)
+- **รายงาน + Export CSV** — สรุปทุกผู้ป่วย + TTR, ดาวน์โหลดเป็น CSV
 
 ---
 
@@ -108,8 +115,14 @@ Login เริ่มต้น: **admin / admin123**
 
 | พิมพ์ | ผลลัพธ์ |
 |-------|---------|
+| `ลงทะเบียน <HN>` | เชื่อมบัญชี LINE กับผู้ป่วย (auto link) |
 | `สถานะ` | สถานะยาวันนี้ + adherence 7 วัน + streak |
 | `ยา` | รายละเอียดยาวันนี้ + ลิงก์ยืนยัน |
+| `adherence` | % การกินยา 7/30 วัน + คะแนนรวม |
+| `inr` | ผล INR ล่าสุด 3 รายการ |
+| `streak` | จำนวนวันติดต่อกัน + คำชม |
+| `อาการ` | ลิงก์ฟอร์มรายงานอาการไม่พึงประสงค์ |
+| `help` | เมนูคำสั่งทั้งหมด |
 
 ---
 
@@ -148,6 +161,7 @@ Warfarin/
 | `lab_results` | ผล INR Lab |
 | `test_scores` | คะแนน pre/post test |
 | `satisfaction_surveys` | แบบสอบถามความพึงพอใจ |
+| `symptom_reports` | รายงานอาการไม่พึงประสงค์ |
 | `notification_log` | Log การส่ง LINE |
 | `audit_log` | บันทึกการกระทำในระบบ |
 
@@ -179,6 +193,16 @@ Warfarin/
 | GET/POST | `/patients/{pid}/survey` | แบบสอบถาม |
 | GET | `/dose/{token_id}` | หน้ายืนยันยา (ผู้ป่วย) |
 | POST | `/dose/{token_id}/confirm` | ยืนยันการกินยา |
+| POST | `/doses/{dose_id}/override` | Staff เปลี่ยนสถานะโดสด้วยมือ |
+| GET | `/qr/{token_id}.png` | QR code PNG ของ token |
+| GET | `/patients/{pid}/qr-sheet` | หน้า QR code รวม (print) |
+| GET/POST | `/report/symptom/{pid}` | รายงานอาการ (ไม่ต้อง login) |
+| GET | `/symptoms` | รายการรายงานอาการ (staff) |
+| GET | `/notifications` | ประวัติ LINE (staff) |
+| GET | `/audit` | Audit log (admin only) |
+| POST | `/line/broadcast` | ส่งข้อความ LINE ถึงทุกคน |
+| POST | `/patients/{pid}/delete` | ปิดบัญชีผู้ป่วย (soft delete) |
+| POST | `/patients/{pid}/reactivate` | เปิดใช้งานใหม่ |
 | GET | `/reports` | รายงาน |
 | GET | `/reports/export` | Export CSV |
 | POST | `/webhook` | LINE Webhook |

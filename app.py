@@ -2040,14 +2040,14 @@ def _draw_menu_icon(draw, cx, cy, icon_key):
         draw.rounded_rectangle([mx-32, my-14, mx+32, my+14], radius=14, outline="white", width=w, fill=None)
         draw.line([mx, my-14, mx, my+14], fill="white", width=w)
         draw.rounded_rectangle([mx, my-14, mx+32, my+14], radius=14, fill="white")
-    elif icon_key == "adherence":
+    elif icon_key == "ความสม่ำเสมอ":
         bw, gap = 14, 6
         x0 = mx - int(1.5 * bw + gap)
         for i, h in enumerate([40, 55, 30]):
             bx = x0 + i * (bw + gap)
             draw.rectangle([bx, my + 28 - h, bx + bw, my + 28], fill="white")
         draw.line([x0 - 4, my + 30, x0 + 3 * (bw + gap), my + 30], fill="white", width=2)
-    elif icon_key == "inr":
+    elif icon_key == "ผลเลือด":
         draw.ellipse([mx-28, my-28, mx+28, my+28], outline="white", width=w)
         draw.ellipse([mx-10, my-10, mx+10, my+10], fill="white")
         draw.line([mx+20, my+20, mx+36, my+36], fill="white", width=w)
@@ -2113,8 +2113,8 @@ def _build_rich_menu_image() -> bytes:
     CELLS = [
         (0,   0,   "สถานะ",     "#4f46e5"),
         (400, 0,   "ยา",        "#059669"),
-        (800, 0,   "adherence", "#0891b2"),
-        (0,   405, "inr",       "#9333ea"),
+        (800, 0,   "ความสม่ำเสมอ", "#0891b2"),
+        (0,   405, "ผลเลือด",     "#9333ea"),
         (400, 405, "ความรู้",   "#f59e0b"),
         (800, 405, "อาการ",     "#e11d48"),
     ]
@@ -2158,11 +2158,11 @@ def _create_rich_menu() -> None:
                 ),
                 RichMenuArea(
                     bounds=RichMenuBounds(x=800, y=0,   width=400, height=405),
-                    action=LineMessageAction(label="adherence",text="adherence"),
+                    action=LineMessageAction(label="ความสม่ำเสมอ", text="ความสม่ำเสมอ"),
                 ),
                 RichMenuArea(
                     bounds=RichMenuBounds(x=0,   y=405, width=400, height=405),
-                    action=LineMessageAction(label="inr",      text="inr"),
+                    action=LineMessageAction(label="ผลเลือด",     text="ผลเลือด"),
                 ),
                 RichMenuArea(
                     bounds=RichMenuBounds(x=400, y=405, width=400, height=405),

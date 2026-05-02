@@ -2062,9 +2062,53 @@ def _draw_menu_icon(draw, cx, cy, icon_key):
         for dy in (-4, 8, 20):
             draw.line([mx-14, my+dy, mx+14, my+dy], fill="white", width=2)
 
+def _load_thai_font(size: int):
+    """โหลดฟอนต์ที่รองรับภาษาไทย — ลอง system fonts ก่อน แล้ว download NotoSansThai เป็น fallback"""
+    from PIL import ImageFont
+    import os
+    import urllib.request
+
+    _FONT_PATHS = [
+        "/usr/share/fonts/opentype/tlwg/Loma-Bold.otf",
+        "/usr/share/fonts/opentype/tlwg/Loma.otf",
+        "/usr/share/fonts/truetype/tlwg/Loma-Bold.ttf",
+        "/usr/share/fonts/truetype/tlwg/Loma.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
+        "/usr/share/fonts/opentype/unifont/unifont.otf",
+        "/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    ]
+    for fp in _FONT_PATHS:
+        try:
+            return ImageFont.truetype(fp, size)
+        except Exception:
+            continue
+
+    # download NotoSansThai และ cache ไว้ใน /tmp
+    _CACHED = "/tmp/_warfarin_NotoSansThai.ttf"
+    if not os.path.exists(_CACHED):
+        try:
+            urllib.request.urlretrieve(
+                "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansThai/NotoSansThai-Regular.ttf",
+                _CACHED,
+            )
+        except Exception:
+            pass
+    try:
+        return ImageFont.truetype(_CACHED, size)
+    except Exception:
+        pass
+
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
 def _build_rich_menu_image() -> bytes:
     """สร้างภาพ Rich Menu 1200×810 px ด้วย Pillow — 2 แถว × 3 คอลัมน์"""
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw
     W, H = 1200, 810
     CELLS = [
         (0,   0,   "สถานะ",     "#4f46e5"),
@@ -2076,20 +2120,7 @@ def _build_rich_menu_image() -> bytes:
     ]
     img = Image.new("RGB", (W, H), "#f1f5f9")
     draw = ImageDraw.Draw(img)
-    _FONT_PATHS = [
-        "/usr/share/fonts/opentype/tlwg/Loma-Bold.otf",
-        "/usr/share/fonts/opentype/tlwg/Loma.otf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    ]
-    font_label = None
-    for fp in _FONT_PATHS:
-        try:
-            font_label = ImageFont.truetype(fp, 36)
-            break
-        except Exception:
-            continue
-    if font_label is None:
-        font_label = ImageFont.load_default(size=36) if hasattr(ImageFont, "load_default") else ImageFont.load_default()
+    font_label = _load_thai_font(36)
     for cx, cy, label, color in CELLS:
         draw.rectangle([cx + 6, cy + 6, cx + 394, cy + 399], fill=color, outline=None)
         _draw_menu_icon(draw, cx, cy, label)

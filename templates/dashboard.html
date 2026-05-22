@@ -9,7 +9,7 @@
         </div>
         <div class="flex items-center gap-2">
             {% if line_configured %}
-            <button onclick="document.getElementById('broadcastModal').classList.remove('hidden')" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors">
+            <button onclick="document.getElementById('broadcastModal').classList.remove('hidden'); updatePreview()" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors">
                 📢 ส่ง LINE ทุกคน
             </button>
             {% else %}
@@ -226,10 +226,6 @@ async function updatePreview() {
         preview.textContent = `จะส่งถึง ${j.count} คน`;
     } catch { preview.textContent = ''; }
 }
-// แสดง preview ครั้งแรกเมื่อ modal เปิด
-document.getElementById('broadcastModal').addEventListener('transitionend', () => {
-    if (!document.getElementById('broadcastModal').classList.contains('hidden')) updatePreview();
-});
 
 async function sendBroadcast() {
     const text = document.getElementById('broadcastText').value.trim();

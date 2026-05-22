@@ -179,7 +179,8 @@ def init_db():
             weight_kg REAL, phone TEXT, line_user_id TEXT,
             chronic_conditions TEXT, diagnosis TEXT,
             target_inr_min REAL DEFAULT 2.0, target_inr_max REAL DEFAULT 3.0,
-            active INTEGER DEFAULT 1, created_at TEXT, updated_at TEXT
+            active INTEGER DEFAULT 1, created_at TEXT, updated_at TEXT,
+            pill_inventory INTEGER DEFAULT 0, registration_code TEXT
         );
         CREATE TABLE IF NOT EXISTS caregivers (
             caregiver_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -553,7 +554,10 @@ def job_mark_missed():
         ).fetchall()
         update_missed_doses(conn)
     for row in pending_rows:
-        send_line_missed_alert(dict(row))
+        try:
+            send_line_missed_alert(dict(row))
+        except Exception as e:
+            print(f"[WARN] missed alert failed for patient {row['patient_id']}: {e}")
         with db() as conn:
             _log_notification(conn, row["patient_id"], row["dose_id"], "missed",
                               "แจ้งเตือนลืมกินยา", True)
@@ -1333,15 +1337,15 @@ def _route_line_command(uid: str, raw: str, text: str) -> list:
             "พิมพ์: ลงทะเบียน <HN>\n"
             "หรือติดต่อเภสัชกร"
         )
-    if text in ("สถานะ", "status"):
+    if raw == "สถานะ" or text == "status":
         return _flex_or_text(_flex_status_bubble, _get_status_reply, pt)
-    if text in ("ยา", "dose", "doses"):
+    if raw == "ยา" or text in ("dose", "doses"):
         return _flex_or_text(_flex_dose_bubble, _get_dose_reply, pt)
-    if text in ("adherence", "ความสม่ำเสมอ"):
+    if raw == "ความสม่ำเสมอ" or text == "adherence":
         return _flex_or_text(_flex_adherence_bubble, _get_adherence_reply, pt)
-    if text in ("inr", "lab", "ผลเลือด"):
+    if raw == "ผลเลือด" or text in ("inr", "lab"):
         return _flex_or_text(_flex_inr_bubble, _get_inr_reply, pt)
-    if text in ("streak", "ต่อเนื่อง"):
+    if raw == "ต่อเนื่อง" or text == "streak":
         return _flex_or_text(_flex_streak_bubble, _get_streak_reply, pt)
     if raw in ("อาการ", "symptom", "symptoms") or text == "symptom":
         return _wrap_text(

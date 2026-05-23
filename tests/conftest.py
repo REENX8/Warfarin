@@ -74,5 +74,5 @@ def admin_login(client):
     r = client.post("/login",
                     data={"username": "admin", "password": "admin123"},
                     follow_redirects=False)
-    assert r.status_code in (200, 303)
+    assert r.status_code == 303
     return client

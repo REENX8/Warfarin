@@ -143,6 +143,16 @@
                 <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">สร้างแผนยา</button>
             </form>
         </div>
+        <!-- Pill Inventory -->
+        <div class="px-6 py-3 bg-amber-50 border-b border-slate-200 flex items-center gap-4">
+            <span class="text-sm text-slate-600">ยาคงเหลือ:</span>
+            <span class="font-semibold text-slate-800">{{ patient.pill_inventory or 0 }} เม็ด</span>
+            <form method="POST" action="/patients/{{ patient.patient_id }}/inventory" class="flex items-center gap-2">
+                <input type="number" name="pill_inventory" min="0" value="{{ patient.pill_inventory or 0 }}"
+                       class="w-20 rounded border-slate-300 text-sm border px-2 py-1">
+                <button type="submit" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded transition-colors">อัปเดต</button>
+            </form>
+        </div>
         <!-- Dose table -->
         <div class="overflow-x-auto">
             <table class="w-full">
@@ -366,13 +376,15 @@ fetch('/api/patients/{{ patient.patient_id }}/inr-data')
     .then(data => {
         if (!data.length) return;
         const ctx = document.getElementById('inrChart').getContext('2d');
+        const inrValues = data.map(d => d.value);
+        const inrMax = inrValues.length ? Math.ceil(Math.max(6, ...inrValues) * 1.1) : 6;
         new Chart(ctx, {
             type: 'line',
             data: {
                 labels: data.map(d => d.date),
                 datasets: [{
                     label: 'INR',
-                    data: data.map(d => d.value),
+                    data: inrValues,
                     borderColor: '#4f46e5',
                     backgroundColor: 'rgba(79,70,229,0.1)',
                     borderWidth: 2, pointRadius: 4, tension: 0.3, fill: true,
@@ -385,7 +397,7 @@ fetch('/api/patients/{{ patient.patient_id }}/inr-data')
                 },
                 scales: {
                     y: {
-                        min: 0, max: 6,
+                        min: 0, max: inrMax,
                         grid: { color: (ctx) => {
                             const v = ctx.tick.value;
                             return (v >= {{ patient.target_inr_min }} && v <= {{ patient.target_inr_max }}) ? 'rgba(16,185,129,0.2)' : 'rgba(0,0,0,0.05)';

@@ -3,36 +3,44 @@
 {% block content %}
 <div class="space-y-6">
     <div>
-        <h1 class="text-2xl font-bold text-slate-800">Audit Log</h1>
-        <p class="text-sm text-slate-500 mt-1">บันทึกการกระทำทั้งหมดในระบบ (300 รายการล่าสุด)</p>
+        <h1 class="text-[22px] font-bold tracking-tight" style="color:#0F1923;">Audit Log</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">บันทึกการกระทำในระบบ (Admin only)</p>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="card" style="padding:0;">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold" style="color:#0F1923;">ประวัติการกระทำ</div>
+                <div class="text-xs mt-0.5" style="color:#8A9BAA;">{{ logs|length }} รายการล่าสุด</div>
+            </div>
+        </div>
         <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-slate-50">
-                    <tr class="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        <th class="px-4 py-3 text-left">เวลา</th>
-                        <th class="px-4 py-3 text-left">ผู้ทำ</th>
-                        <th class="px-4 py-3 text-left">กระทำ</th>
-                        <th class="px-4 py-3 text-left">Entity</th>
-                        <th class="px-4 py-3 text-left">ID</th>
-                        <th class="px-4 py-3 text-left">รายละเอียด</th>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>เวลา</th>
+                        <th>ผู้ใช้</th>
+                        <th>การกระทำ</th>
+                        <th class="hidden md:table-cell">IP</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
-                    {% for l in logs %}
-                    <tr class="hover:bg-slate-50">
-                        <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{{ l.created_at[:16] if l.created_at else '-' }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-700">{{ l.performed_by }}</td>
-                        <td class="px-4 py-3 text-sm font-medium text-indigo-600">{{ l.action }}</td>
-                        <td class="px-4 py-3 text-xs text-slate-500">{{ l.entity_type }}</td>
-                        <td class="px-4 py-3 text-xs text-slate-400">{{ l.entity_id }}</td>
-                        <td class="px-4 py-3 text-xs text-slate-600">{{ l.details }}</td>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td style="color:#8A9BAA; white-space:nowrap; font-size:12px;">
+                            {{ log.created_at[:16] if log.created_at else '-' }}
+                        </td>
+                        <td>
+                            <span class="badge badge-primary">{{ log.username or 'system' }}</span>
+                        </td>
+                        <td style="font-size:13px; color:#0F1923;">{{ log.action }}</td>
+                        <td class="hidden md:table-cell" style="font-size:12px; color:#8A9BAA;">
+                            {{ log.ip_address or '-' }}
+                        </td>
                     </tr>
                     {% endfor %}
                     {% if not logs %}
-                    <tr><td colspan="6" class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีข้อมูล</td></tr>
+                    <tr><td colspan="4" class="text-center py-14" style="color:#8A9BAA;">ยังไม่มี Audit Log</td></tr>
                     {% endif %}
                 </tbody>
             </table>

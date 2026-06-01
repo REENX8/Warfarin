@@ -3,53 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ผลการยืนยัน | รพ.สุไหงปาดี</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>ผลการยืนยันยา | รพ.สุไหงปาดี</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+        body { font-family:'Sarabun',sans-serif; background:#F0F4F8; min-height:100vh;
+               display:flex; align-items:flex-start; justify-content:center; padding:24px 16px 48px; }
+        .shell { width:100%; max-width:420px; }
+        .card { background:#fff; border:1px solid #E2E8F0; border-radius:16px;
+                box-shadow:0 4px 16px rgba(15,27,40,.07); overflow:hidden; }
+        .hero { background:linear-gradient(160deg,#065F46,#059669); padding:36px 28px 28px; text-align:center; }
+        .check-circle { width:72px; height:72px; border-radius:50%; background:rgba(255,255,255,.2);
+                        display:flex; align-items:center; justify-content:center; margin:0 auto 18px; }
+        .hero h2 { font-size:24px; font-weight:800; color:#fff; margin-bottom:6px; }
+        .hero p  { font-size:14px; color:rgba(255,255,255,.8); line-height:1.5; }
+        .body { padding:22px; display:flex; flex-direction:column; gap:14px; }
+        .streak-card { background:#FFFBEB; border:1px solid #FDE68A; border-radius:14px; padding:18px 20px; }
+        .streak-card .label { font-size:11px; color:#92400E; font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px; }
+        .streak-row { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+        .streak-val { font-size:36px; font-weight:800; color:#D97706; line-height:1; }
+        .streak-unit { font-size:14px; color:#92400E; }
+        .progress-track { height:8px; border-radius:4px; background:#FDE68A; overflow:hidden; margin-bottom:6px; }
+        .progress-fill  { height:100%; border-radius:4px; background:linear-gradient(90deg,#D97706,#F59E0B); }
+        .progress-meta { font-size:12px; color:#A16207; display:flex; justify-content:space-between; }
+        .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .stat-mini { border-radius:12px; padding:14px 16px; text-align:center; }
+        .stat-mini .s-label { font-size:11px; font-weight:600; margin-bottom:4px; }
+        .stat-mini .s-value { font-size:26px; font-weight:800; }
+        .btn-home { display:block; width:100%; padding:13px; border-radius:12px; border:none;
+                    background:#0B1F36; color:#fff; font-size:14px; font-weight:600;
+                    cursor:pointer; font-family:inherit; text-align:center; text-decoration:none; }
+    </style>
 </head>
-<body class="bg-gradient-to-b from-slate-50 to-white min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-sm text-center">
-        {% if success %}
-        <!-- Success -->
-        <div class="inline-flex items-center justify-center w-20 h-20 bg-emerald-100 rounded-full mb-4">
-            <svg class="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
-            </svg>
-        </div>
-        <h1 class="text-2xl font-bold text-slate-800 mb-2">บันทึกเรียบร้อย!</h1>
-        <p class="text-slate-600 mb-6">{{ message }}</p>
-
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-3 text-left">
-            <div class="flex justify-between text-sm">
-                <span class="text-slate-500">ยา</span>
-                <span class="font-medium text-slate-700">วาร์ฟาริน {{ dose.warfarin_mg }} mg</span>
+<body>
+<div class="shell">
+    <div class="card">
+        <div class="hero">
+            <div class="check-circle">
+                <svg width="32" height="32" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
             </div>
-            <div class="flex justify-between text-sm">
-                <span class="text-slate-500">วันที่</span>
-                <span class="font-medium text-slate-700">{{ dose.scheduled_date }}</span>
+            <h2>ยืนยันสำเร็จ!</h2>
+            <p>บันทึกการกินยาแล้ว<br>{{ confirmed_at[:16] if confirmed_at else '' }} น.</p>
+        </div>
+
+        <div class="body">
+            <!-- Streak -->
+            <div class="streak-card">
+                <div class="label">ความต่อเนื่องในการกินยา</div>
+                <div class="streak-row">
+                    <span style="font-size:40px;">🔥</span>
+                    <div>
+                        <div><span class="streak-val">{{ streak }}</span> <span class="streak-unit">วัน</span></div>
+                        <div style="font-size:12px; color:#92400E;">ติดต่อกัน!</div>
+                    </div>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" style="width:{{ [streak * 5, 100]|min }}%;"></div>
+                </div>
+                <div class="progress-meta">
+                    <span>เป้าหมาย 20 วัน</span>
+                    <span>{{ [streak * 5, 100]|min }}%</span>
+                </div>
             </div>
-            <div class="flex justify-between text-sm">
-                <span class="text-slate-500">ผู้ป่วย</span>
-                <span class="font-medium text-slate-700">{{ dose.full_name }}</span>
+
+            <!-- Score + adherence -->
+            <div class="stats-grid">
+                <div class="stat-mini" style="background:#EFF8FF;">
+                    <div class="s-label" style="color:#0369A1;">คะแนนวันนี้</div>
+                    <div class="s-value" style="color:#0284C7;">+{{ points_today or 10 }}</div>
+                    <div style="font-size:11px; color:#0369A1;">รวม: {{ gamification_score }}</div>
+                </div>
+                <div class="stat-mini" style="background:#ECFDF5;">
+                    <div class="s-label" style="color:#065F46;">Adherence 30 วัน</div>
+                    <div class="s-value" style="color:#059669;">{{ adh30 }}%</div>
+                </div>
             </div>
-        </div>
 
-        <div class="mt-6 bg-indigo-50 rounded-xl p-4">
-            <p class="text-sm text-indigo-700 font-medium">💪 ขอบคุณที่รักษาความสม่ำเสมอ</p>
-            <p class="text-xs text-indigo-500 mt-1">กินยาให้ต่อเนื่องทุกวัน สุขภาพจะดีขึ้นค่ะ</p>
+            <a href="/" class="btn-home">กลับหน้าหลัก</a>
         </div>
-
-        {% else %}
-        <!-- Error -->
-        <div class="inline-flex items-center justify-center w-20 h-20 bg-rose-100 rounded-full mb-4">
-            <svg class="w-10 h-10 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-        </div>
-        <h1 class="text-2xl font-bold text-slate-800 mb-2">ไม่สำเร็จ</h1>
-        <p class="text-slate-600">{{ message }}</p>
-        {% endif %}
-
-        <p class="text-center text-xs text-slate-400 mt-8">ระบบติดตามยาวาร์ฟาริน | รพ.สุไหงปาดี</p>
     </div>
+</div>
 </body>
 </html>

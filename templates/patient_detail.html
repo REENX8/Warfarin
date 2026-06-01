@@ -1,453 +1,129 @@
 {% extends "base.html" %}
 {% block title %}{{ patient.full_name }}{% endblock %}
 {% block content %}
-<div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-            <a href="/patients" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">&larr; กลับรายชื่อ</a>
-            <h1 class="text-2xl font-bold text-slate-800 mt-1">{{ patient.full_name }}</h1>
-            <p class="text-sm text-slate-500">HN: {{ patient.hn or '-' }} | อายุ: {{ patient.age_years or '-' }} ปี | น้ำหนัก: {{ patient.weight_kg or '-' }} kg</p>
+<div class="space-y-5">
+
+    <!-- Back -->
+    <a href="/patients" class="text-[13px] font-medium inline-flex items-center gap-1" style="color:#0284C7;">← กลับรายชื่อ</a>
+
+    <!-- Patient header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div class="flex items-center gap-4">
+            <div class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0" style="background:#0284C7;">
+                {{ patient.full_name[3:5] if patient.full_name|length > 3 else patient.full_name[:2] }}
+            </div>
+            <div>
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                    <h1 class="text-[21px] font-bold tracking-tight" style="color:#0F1923;">{{ patient.full_name }}</h1>
+                    {% if patient.line_user_id %}<span class="badge badge-primary">LINE ✓</span>{% endif %}
+                    {% if not patient.active %}<span class="badge badge-default">ปิดบัญชี</span>{% endif %}
+                </div>
+                <p class="text-[13px]" style="color:#8A9BAA;">HN: {{ patient.hn or '-' }} · อายุ {{ patient.age_years or '-' }} ปี · น้ำหนัก {{ patient.weight_kg or '-' }} kg · {{ patient.diagnosis or '-' }}</p>
+            </div>
         </div>
         <div class="flex flex-wrap gap-2">
-            <a href="/patients/{{ patient.patient_id }}/qr-sheet" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 transition-colors">
-                📱 QR Sheet
-            </a>
-            <a href="/patients/{{ patient.patient_id }}/survey" class="inline-flex items-center gap-2 px-4 py-2 bg-violet-50 border border-violet-200 text-violet-700 text-sm font-medium rounded-lg hover:bg-violet-100 transition-colors">
-                📋 แบบสอบถาม
-            </a>
-            <a href="/patients/{{ patient.patient_id }}/edit" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
-                ✏️ แก้ไข
-            </a>
+            <a href="/patients/{{ patient.patient_id }}/qr-sheet" class="btn btn-secondary btn-sm">📱 QR Sheet</a>
+            <a href="/patients/{{ patient.patient_id }}/survey" class="btn btn-secondary btn-sm">📋 แบบสอบถาม</a>
+            <a href="/patients/{{ patient.patient_id }}/edit" class="btn btn-secondary btn-sm">✏️ แก้ไข</a>
             {% if patient.active %}
-            <form method="POST" action="/patients/{{ patient.patient_id }}/delete" onsubmit="return confirm('ยืนยันการปิดบัญชีผู้ป่วย?');" class="inline">
-                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium rounded-lg hover:bg-rose-100 transition-colors">
-                    🗄️ ปิดบัญชี
-                </button>
+            <form method="POST" action="/patients/{{ patient.patient_id }}/delete" onsubmit="return confirm('ยืนยันการปิดบัญชี?');">
+                <button type="submit" class="btn btn-sm" style="background:#FEF2F2; color:#991B1B; border:1px solid #FECACA;">🗄️ ปิดบัญชี</button>
             </form>
             {% else %}
-            <form method="POST" action="/patients/{{ patient.patient_id }}/reactivate" class="inline">
-                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium rounded-lg hover:bg-emerald-100 transition-colors">
-                    ♻️ เปิดใช้งานอีกครั้ง
-                </button>
+            <form method="POST" action="/patients/{{ patient.patient_id }}/reactivate">
+                <button type="submit" class="btn btn-sm" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0;">♻️ เปิดใช้งาน</button>
             </form>
             {% endif %}
         </div>
     </div>
 
-    <!-- Patient info + Caregiver -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            <div><span class="text-slate-500">วินิจฉัย:</span><br><span class="font-medium text-slate-700">{{ patient.diagnosis or '-' }}</span></div>
-            <div><span class="text-slate-500">โรคประจำตัว:</span><br><span class="font-medium text-slate-700">{{ patient.chronic_conditions or '-' }}</span></div>
-            <div><span class="text-slate-500">INR เป้าหมาย:</span><br><span class="font-medium text-slate-700">{{ patient.target_inr_min }}-{{ patient.target_inr_max }}</span></div>
-            <div><span class="text-slate-500">LINE:</span><br><span class="font-medium {{ 'text-emerald-600' if patient.line_user_id else 'text-slate-400' }}">{{ 'เชื่อมต่อแล้ว' if patient.line_user_id else 'ยังไม่เชื่อมต่อ' }}</span></div>
+    <!-- Patient info -->
+    <div class="card" style="padding:18px 22px;">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[13px]">
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">วินิจฉัย</div><div class="font-semibold" style="color:#0F1923;">{{ patient.diagnosis or '-' }}</div></div>
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">โรคประจำตัว</div><div class="font-semibold" style="color:#0F1923;">{{ patient.chronic_conditions or '-' }}</div></div>
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">INR เป้าหมาย</div><div class="font-semibold" style="color:#0F1923;">{{ patient.target_inr_min }}–{{ patient.target_inr_max }}</div></div>
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">LINE</div><div class="font-semibold" style="color:{% if patient.line_user_id %}#059669{% else %}#8A9BAA{% endif %};">{{ 'เชื่อมต่อแล้ว' if patient.line_user_id else 'ยังไม่เชื่อมต่อ' }}</div></div>
         </div>
         {% if caregivers %}
-        <div class="mt-3 pt-3 border-t border-slate-100 text-sm text-slate-600">
-            <span class="text-slate-500">ผู้ดูแล:</span> {{ caregivers[0].name }} ({{ caregivers[0].relationship or '-' }}) โทร {{ caregivers[0].phone or '-' }}
+        <div class="mt-3 pt-3 text-[13px]" style="border-top:1px solid #E2E8F0; color:#4B5E6D;">
+            <span style="color:#8A9BAA;">ผู้ดูแล:</span> <strong>{{ caregivers[0].name }}</strong> ({{ caregivers[0].relationship or '-' }}) โทร {{ caregivers[0].phone or '-' }}
         </div>
         {% endif %}
     </div>
 
-    <!-- Score cards -->
+    <!-- Score row -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
-            <p class="text-xs font-medium text-slate-500">Adherence 7 วัน</p>
-            <p class="text-2xl font-bold mt-1 {% if adh7.percent >= 80 %}text-emerald-600{% elif adh7.percent >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ adh7.percent }}%</p>
+        <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">Adherence 7 วัน</div>
+            <div class="text-[20px] font-bold {% if adh7.percent >= 80 %}text-emerald-600{% elif adh7.percent >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ adh7.percent }}%</div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
-            <p class="text-xs font-medium text-slate-500">กินยาต่อเนื่อง</p>
-            <p class="text-2xl font-bold text-indigo-600 mt-1">{{ streak }} <span class="text-sm font-normal">วัน</span></p>
+        <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">Streak 🔥</div>
+            <div class="text-[20px] font-bold" style="color:#D97706;">{{ streak }} <span class="text-sm font-normal" style="color:#92400E;">วัน</span></div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
-            <p class="text-xs font-medium text-slate-500">คะแนนรวม</p>
-            <p class="text-2xl font-bold text-amber-500 mt-1">{{ gamification_score }}</p>
+        <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">คะแนนรวม</div>
+            <div class="text-[20px] font-bold" style="color:#7C3AED;">{{ gamification_score }}</div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
-            <p class="text-xs font-medium text-slate-500">Adherence 30 วัน</p>
-            <p class="text-2xl font-bold text-slate-700 mt-1">{{ adh30.percent }}%</p>
-            <p class="text-xs text-slate-400">กิน {{ adh30.taken }} / พลาด {{ adh30.missed }}</p>
+        <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">Adherence 30 วัน</div>
+            <div class="text-[20px] font-bold {% if adh30.percent >= 80 %}text-emerald-600{% elif adh30.percent >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ adh30.percent }}%</div>
+            <div class="text-[11px]" style="color:#8A9BAA;">กิน {{ adh30.taken }} / พลาด {{ adh30.missed }}</div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-center">
-            <p class="text-xs font-medium text-slate-500">TTR</p>
-            <p class="text-2xl font-bold {% if ttr and ttr >= 65 %}text-emerald-600{% elif ttr %}text-amber-600{% else %}text-slate-400{% endif %} mt-1">
-                {% if ttr is not none %}{{ ttr }}%{% else %}—{% endif %}
-            </p>
-            <p class="text-xs text-slate-400">Time in Range</p>
+        <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">TTR</div>
+            <div class="text-[20px] font-bold {% if ttr and ttr >= 65 %}text-emerald-600{% elif ttr %}text-amber-600{% else %}text-slate-400{% endif %}">{% if ttr is not none %}{{ ttr }}%{% else %}—{% endif %}</div>
+            <div class="text-[11px]" style="color:#8A9BAA;">Time in Range</div>
         </div>
     </div>
 
-    <!-- Today's dose QR -->
-    {% if today_dose and today_dose.token_id %}
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-        <div class="flex flex-col sm:flex-row items-center gap-5">
-            <img src="/qr/{{ today_dose.token_id }}.png" alt="QR" class="w-32 h-32 rounded-lg border border-slate-200">
-            <div class="flex-1 text-center sm:text-left">
-                <p class="text-xs font-medium text-indigo-600 uppercase">โดสวันนี้</p>
-                <p class="text-2xl font-bold text-slate-800 mt-1">{{ today_dose.warfarin_mg }} mg</p>
-                <p class="text-sm text-slate-500">เวลา {{ today_dose.scheduled_time }} น. — {{ today_dose.pill_description or 'ยาวาร์ฟาริน' }}</p>
-                <p class="text-xs text-slate-400 mt-1">สถานะ:
-                    {% if today_dose.status == 'taken' %}<span class="text-emerald-600">กินแล้ว ✅</span>
-                    {% elif today_dose.status == 'late' %}<span class="text-amber-600">กินแล้ว (ช้า) ⏰</span>
-                    {% elif today_dose.status == 'missed' %}<span class="text-rose-600">พลาด ❌</span>
-                    {% else %}<span class="text-slate-600">ยังไม่ยืนยัน 🕐</span>{% endif %}
-                </p>
-                <a href="/dose/{{ today_dose.token_id }}" target="_blank" class="inline-block mt-2 text-xs text-indigo-600 hover:text-indigo-800 font-medium">เปิดลิงก์ยืนยัน →</a>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Dose Management -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">แผนการกินยา</h2>
-            <button onclick="document.getElementById('doseForm').classList.toggle('hidden')" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ สร้างแผน</button>
-        </div>
-        <!-- Dose creation form -->
-        <div id="doseForm" class="hidden px-6 py-4 bg-slate-50 border-b border-slate-200">
-            <form method="POST" action="/patients/{{ patient.patient_id }}/doses" class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">วันเริ่มต้น</label>
-                        <input type="date" name="start_date" required class="w-full rounded-lg border-slate-300 text-sm border px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">วันสิ้นสุด</label>
-                        <input type="date" name="end_date" required class="w-full rounded-lg border-slate-300 text-sm border px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">เวลากินยา</label>
-                        <input type="time" name="scheduled_time" value="18:00" class="w-full rounded-lg border-slate-300 text-sm border px-3 py-2">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">ขนาดยาเริ่มต้น (mg)</label>
-                    <input type="number" step="0.25" name="warfarin_mg" value="2" class="w-32 rounded-lg border-slate-300 text-sm border px-3 py-2">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-2">ขนาดยาตามวัน (mg) — เว้นว่างใช้ค่าเริ่มต้น</label>
-                    <div class="grid grid-cols-7 gap-2">
-                        {% for d in ['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'] %}
-                        <div class="text-center">
-                            <span class="text-xs text-slate-500">{{ d }}</span>
-                            <input type="number" step="0.25" name="dose_day_{{ loop.index0 }}" placeholder="-" class="w-full mt-1 rounded border-slate-300 text-sm text-center border px-1 py-1.5">
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">ลักษณะเม็ดยา</label>
-                    <input type="text" name="pill_description" placeholder="เช่น เม็ดสีชมพู 1 เม็ด" class="w-full rounded-lg border-slate-300 text-sm border px-3 py-2">
-                </div>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">สร้างแผนยา</button>
-            </form>
-        </div>
-        <!-- Pill Inventory -->
-        <div class="px-6 py-3 bg-amber-50 border-b border-slate-200 flex items-center gap-4">
-            <span class="text-sm text-slate-600">ยาคงเหลือ:</span>
-            <span class="font-semibold text-slate-800">{{ patient.pill_inventory or 0 }} เม็ด</span>
-            <form method="POST" action="/patients/{{ patient.patient_id }}/inventory" class="flex items-center gap-2">
-                <input type="number" name="pill_inventory" min="0" value="{{ patient.pill_inventory or 0 }}"
-                       class="w-20 rounded border-slate-300 text-sm border px-2 py-1">
-                <button type="submit" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded transition-colors">อัปเดต</button>
-            </form>
-        </div>
-        <!-- Dose table -->
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-slate-50"><tr class="text-xs font-medium text-slate-500 uppercase">
-                    <th class="px-6 py-2.5 text-left">วันที่</th>
-                    <th class="px-4 py-2.5 text-center">เวลา</th>
-                    <th class="px-4 py-2.5 text-center">ขนาด</th>
-                    <th class="px-4 py-2.5 text-left hidden sm:table-cell">ลักษณะยา</th>
-                    <th class="px-4 py-2.5 text-center">สถานะ</th>
-                    <th class="px-4 py-2.5 text-center hidden sm:table-cell">ยืนยัน</th>
-                    <th class="px-4 py-2.5 text-right">จัดการ</th>
-                </tr></thead>
-                <tbody class="divide-y divide-slate-100">
-                    {% for d in doses %}
-                    <tr class="hover:bg-slate-50">
-                        <td class="px-6 py-2.5 text-sm text-slate-700">{{ d.scheduled_date }}</td>
-                        <td class="px-4 py-2.5 text-sm text-slate-600 text-center">{{ d.scheduled_time }}</td>
-                        <td class="px-4 py-2.5 text-sm text-slate-700 text-center font-medium">{{ d.warfarin_mg }} mg</td>
-                        <td class="px-4 py-2.5 text-sm text-slate-500 hidden sm:table-cell">{{ d.pill_description or '-' }}</td>
-                        <td class="px-4 py-2.5 text-center">
-                            {% if d.status == 'taken' %}<span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">กินแล้ว</span>
-                            {% elif d.status == 'late' %}<span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">สาย</span>
-                            {% elif d.status == 'missed' %}<span class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-700">พลาด</span>
-                            {% else %}<span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">รอ</span>{% endif %}
-                        </td>
-                        <td class="px-4 py-2.5 text-xs text-slate-400 text-center hidden sm:table-cell">{{ d.confirmed_at[:16] if d.confirmed_at else '-' }}</td>
-                        <td class="px-4 py-2.5 text-right text-xs whitespace-nowrap">
-                            {% if d.token_id %}<a href="/dose/{{ d.token_id }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 mr-2">ลิงก์</a>{% endif %}
-                            <form method="POST" action="/doses/{{ d.dose_id }}/override" class="inline">
-                                <select name="status" onchange="if(confirm('เปลี่ยนสถานะโดยเจ้าหน้าที่?'))this.form.submit(); else this.selectedIndex=0;" class="text-xs border rounded px-1 py-0.5 text-slate-500">
-                                    <option value="">⚙️</option>
-                                    <option value="taken">→ กินแล้ว</option>
-                                    <option value="late">→ สาย</option>
-                                    <option value="missed">→ พลาด</option>
-                                    <option value="planned">→ รอ</option>
-                                </select>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    {% if not doses %}<tr><td colspan="7" class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีแผนยา</td></tr>{% endif %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Lab Results + INR Chart -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">ผลตรวจ INR</h2>
-            <button onclick="document.getElementById('labForm').classList.toggle('hidden')" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ บันทึกผล</button>
-        </div>
-        <div id="labForm" class="hidden px-6 py-4 bg-slate-50 border-b border-slate-200">
-            <form method="POST" action="/patients/{{ patient.patient_id }}/lab" class="flex flex-wrap items-end gap-3">
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">ค่า INR</label>
-                    <input type="number" step="0.01" name="value" required class="w-24 rounded-lg border-slate-300 text-sm border px-3 py-2">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">วันที่ตรวจ</label>
-                    <input type="date" name="test_date" class="rounded-lg border-slate-300 text-sm border px-3 py-2">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">หมายเหตุ</label>
-                    <input type="text" name="notes" class="rounded-lg border-slate-300 text-sm border px-3 py-2">
-                </div>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">บันทึก</button>
-            </form>
-        </div>
-        <div class="p-6">
-            <canvas id="inrChart" height="200"></canvas>
-        </div>
-        {% if labs %}
-        <div class="overflow-x-auto border-t border-slate-100">
-            <table class="w-full"><thead class="bg-slate-50"><tr class="text-xs font-medium text-slate-500 uppercase">
-                <th class="px-6 py-2.5 text-left">วันที่</th><th class="px-4 py-2.5 text-center">INR</th><th class="px-4 py-2.5 text-center">ในเป้า</th><th class="px-4 py-2.5 text-left">หมายเหตุ</th>
-            </tr></thead><tbody class="divide-y divide-slate-100">
-                {% for l in labs %}
-                <tr class="hover:bg-slate-50">
-                    <td class="px-6 py-2.5 text-sm text-slate-700">{{ l.test_date }}</td>
-                    <td class="px-4 py-2.5 text-sm font-medium text-center {% if l.in_range %}text-emerald-600{% else %}text-rose-600{% endif %}">{{ l.value }}</td>
-                    <td class="px-4 py-2.5 text-center">{{ '✅' if l.in_range else '❌' }}</td>
-                    <td class="px-4 py-2.5 text-sm text-slate-500">{{ l.notes or '-' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody></table>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- Adherence Heatmap (90 วัน) -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">ภาพรวมการกินยา 90 วัน</h2>
-            <div class="flex items-center gap-3 text-xs text-slate-500">
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-emerald-500"></span> กินแล้ว</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-rose-500"></span> พลาด</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-slate-300"></span> รอ</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-slate-100 border border-slate-200"></span> ไม่มี</span>
-            </div>
-        </div>
-        <div class="p-6">
-            <div id="heatmap" class="grid grid-rows-7 grid-flow-col gap-1 w-fit" style="grid-template-rows: repeat(7, minmax(0, 1fr));"></div>
-            <p id="heatmapEmpty" class="hidden text-center text-sm text-slate-400 py-8">ยังไม่มีข้อมูล</p>
-        </div>
-    </div>
-
-    <!-- Test Scores -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">คะแนนแบบทดสอบ</h2>
-            <button onclick="document.getElementById('scoreForm').classList.toggle('hidden')" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ บันทึกคะแนน</button>
-        </div>
-        <div id="scoreForm" class="hidden px-6 py-4 bg-slate-50 border-b border-slate-200">
-            <form method="POST" action="/patients/{{ patient.patient_id }}/test-score" class="flex flex-wrap items-end gap-3">
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">ประเภท</label>
-                    <select name="test_type" class="rounded-lg border-slate-300 text-sm border px-3 py-2">
-                        <option value="pre">Pre-test</option><option value="post">Post-test</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">คะแนน</label>
-                    <input type="number" step="0.5" name="score" required class="w-24 rounded-lg border-slate-300 text-sm border px-3 py-2">
-                </div>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">บันทึก</button>
-            </form>
-        </div>
-        {% if scores %}
-        <div class="overflow-x-auto">
-            <table class="w-full"><thead class="bg-slate-50"><tr class="text-xs font-medium text-slate-500 uppercase">
-                <th class="px-6 py-2.5 text-left">ประเภท</th><th class="px-4 py-2.5 text-center">คะแนน</th><th class="px-4 py-2.5 text-left">วันที่</th>
-            </tr></thead><tbody class="divide-y divide-slate-100">
-                {% for s in scores %}
-                <tr class="hover:bg-slate-50">
-                    <td class="px-6 py-2.5 text-sm font-medium {% if s.test_type == 'pre' %}text-amber-600{% else %}text-emerald-600{% endif %}">{{ 'Pre-test' if s.test_type == 'pre' else 'Post-test' }}</td>
-                    <td class="px-4 py-2.5 text-sm font-bold text-center text-slate-700">{{ s.score }}/{{ s.max_score }}</td>
-                    <td class="px-4 py-2.5 text-sm text-slate-500">{{ s.taken_at[:10] if s.taken_at else '-' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody></table>
-        </div>
-        {% else %}
-        <div class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีผลแบบทดสอบ</div>
-        {% endif %}
-    </div>
-
-    <!-- Symptom reports -->
-    {% if symptoms %}
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-        <div class="px-6 py-4 border-b border-slate-100">
-            <h2 class="text-base font-semibold text-slate-800">รายงานอาการ (10 รายการล่าสุด)</h2>
-        </div>
-        <div class="divide-y divide-slate-100">
-            {% for s in symptoms %}
-            <div class="px-6 py-3 flex items-center gap-3">
-                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold
-                    {% if s.severity >= 4 %}bg-rose-100 text-rose-700
-                    {% elif s.severity == 3 %}bg-amber-100 text-amber-700
-                    {% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ s.severity }}/5</span>
-                <div class="flex-1 text-xs text-slate-600 space-x-1">
-                    {% if s.bleeding %}<span class="inline-block bg-rose-50 text-rose-700 rounded px-2 py-0.5">เลือดออก</span>{% endif %}
-                    {% if s.bruising %}<span class="inline-block bg-purple-50 text-purple-700 rounded px-2 py-0.5">ช้ำ</span>{% endif %}
-                    {% if s.headache %}<span class="inline-block bg-amber-50 text-amber-700 rounded px-2 py-0.5">ปวดหัว</span>{% endif %}
-                    {% if s.dizziness %}<span class="inline-block bg-sky-50 text-sky-700 rounded px-2 py-0.5">เวียนหัว</span>{% endif %}
-                    {% if s.nausea %}<span class="inline-block bg-lime-50 text-lime-700 rounded px-2 py-0.5">คลื่นไส้</span>{% endif %}
-                    {% if s.other %}<span class="text-slate-500">— {{ s.other }}</span>{% endif %}
-                </div>
-                <span class="text-xs text-slate-400">{{ s.created_at[:16] if s.created_at else s.report_date }}</span>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Satisfaction Survey Results -->
-    {% if surveys %}
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">ผลแบบสอบถามความพึงพอใจ</h2>
-            <a href="/patients/{{ patient.patient_id }}/survey" class="text-sm text-violet-600 hover:text-violet-800 font-medium">+ เพิ่ม</a>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="w-full"><thead class="bg-slate-50"><tr class="text-xs font-medium text-slate-500 uppercase">
-                <th class="px-6 py-2.5 text-left">วันที่</th>
-                <th class="px-4 py-2.5 text-center">ใช้งาน</th>
-                <th class="px-4 py-2.5 text-center">LINE</th>
-                <th class="px-4 py-2.5 text-center">การเตือน</th>
-                <th class="px-4 py-2.5 text-left hidden md:table-cell">ความคิดเห็น</th>
-            </tr></thead><tbody class="divide-y divide-slate-100">
-                {% for sv in surveys %}
-                <tr class="hover:bg-slate-50">
-                    <td class="px-6 py-2.5 text-sm text-slate-600">{{ sv.survey_date }}</td>
-                    <td class="px-4 py-2.5 text-center text-sm font-semibold text-slate-700">{{ sv.ease_of_use }}/5</td>
-                    <td class="px-4 py-2.5 text-center text-sm font-semibold text-slate-700">{{ sv.line_satisfaction }}/5</td>
-                    <td class="px-4 py-2.5 text-center text-sm font-semibold text-slate-700">{{ sv.reminder_helpful }}/5</td>
-                    <td class="px-4 py-2.5 text-sm text-slate-500 hidden md:table-cell">{{ sv.comments or '-' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody></table>
-        </div>
-    </div>
-    {% else %}
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center justify-between">
-        <div>
-            <p class="text-sm font-medium text-slate-700">แบบสอบถามความพึงพอใจ</p>
-            <p class="text-xs text-slate-400 mt-0.5">ยังไม่มีแบบสอบถาม</p>
-        </div>
-        <a href="/patients/{{ patient.patient_id }}/survey" class="inline-flex items-center gap-2 px-3 py-2 bg-violet-50 text-violet-700 text-sm font-medium rounded-lg hover:bg-violet-100 transition-colors">
-            + เพิ่มแบบสอบถาม
-        </a>
-    </div>
-    {% endif %}
+    {% include "_patient_detail_body.html" %}
 </div>
-{% endblock %}
 
 {% block extra_js %}
 <script>
-fetch('/api/patients/{{ patient.patient_id }}/inr-data')
-    .then(r => r.json())
-    .then(data => {
-        if (!data.length) return;
-        const ctx = document.getElementById('inrChart').getContext('2d');
-        const inrValues = data.map(d => d.value);
-        const inrMax = inrValues.length ? Math.ceil(Math.max(6, ...inrValues) * 1.1) : 6;
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.map(d => d.date),
-                datasets: [{
-                    label: 'INR',
-                    data: inrValues,
-                    borderColor: '#4f46e5',
-                    backgroundColor: 'rgba(79,70,229,0.1)',
-                    borderWidth: 2, pointRadius: 4, tension: 0.3, fill: true,
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    annotation: { annotations: {} }
-                },
-                scales: {
-                    y: {
-                        min: 0, max: inrMax,
-                        grid: { color: (ctx) => {
-                            const v = ctx.tick.value;
-                            return (v >= {{ patient.target_inr_min }} && v <= {{ patient.target_inr_max }}) ? 'rgba(16,185,129,0.2)' : 'rgba(0,0,0,0.05)';
-                        }}
-                    }
-                }
-            },
-            plugins: [{
-                id: 'targetZone',
-                beforeDraw(chart) {
-                    const {ctx, chartArea: {left, right}, scales: {y}} = chart;
-                    const top = y.getPixelForValue({{ patient.target_inr_max }});
-                    const bottom = y.getPixelForValue({{ patient.target_inr_min }});
-                    ctx.save();
-                    ctx.fillStyle = 'rgba(16,185,129,0.08)';
-                    ctx.fillRect(left, top, right - left, bottom - top);
-                    ctx.restore();
-                }
-            }]
-        });
+fetch('/api/patients/{{ patient.patient_id }}/inr-data').then(r=>r.json()).then(data => {
+    if (!data.length) return;
+    const ctx = document.getElementById('inrChart').getContext('2d');
+    const targetMin = {{ patient.target_inr_min }};
+    const targetMax = {{ patient.target_inr_max }};
+    const dotColors = data.map(d => (d.value >= targetMin && d.value <= targetMax) ? '#059669' : '#DC2626');
+    new Chart(ctx, {
+        type: 'line',
+        data: { labels: data.map(d=>d.date), datasets: [{
+            label:'INR', data: data.map(d=>d.value),
+            borderColor:'#0284C7', backgroundColor:'rgba(2,132,199,.07)',
+            borderWidth:2.5, pointRadius:5.5, pointHoverRadius:7,
+            pointBackgroundColor:dotColors, pointBorderColor:'#fff', pointBorderWidth:1.5,
+            tension:.35, fill:true,
+        }]},
+        options: { responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` INR: ${c.raw}`}}},
+            scales:{ x:{ grid:{display:false}, ticks:{font:{family:'Sarabun',size:11},color:'#8A9BAA'}},
+                     y:{ min:0, max:6, grid:{color:'rgba(0,0,0,.04)'}, ticks:{font:{family:'Sarabun',size:11},color:'#8A9BAA'}}}
+        },
+        plugins: [{ id:'targetZone', beforeDraw(chart) {
+            const {ctx, chartArea:{left,right}, scales:{y}} = chart;
+            const top = y.getPixelForValue(targetMax), bot = y.getPixelForValue(targetMin);
+            ctx.save(); ctx.fillStyle='rgba(5,150,105,.08)'; ctx.fillRect(left, top, right-left, bot-top); ctx.restore();
+        }}]
     });
+});
 
-// 90-day adherence heatmap
-fetch('/api/patients/{{ patient.patient_id }}/heatmap-data')
-    .then(r => r.json())
-    .then(data => {
-        const grid = document.getElementById('heatmap');
-        const empty = document.getElementById('heatmapEmpty');
-        if (!grid) return;
-        if (!data || !data.length) { grid.classList.add('hidden'); empty.classList.remove('hidden'); return; }
-        const colorMap = {
-            taken: 'bg-emerald-500',
-            late: 'bg-emerald-400',
-            missed: 'bg-rose-500',
-            planned: 'bg-slate-300',
-            none: 'bg-slate-100 border border-slate-200',
-        };
-        const labelMap = {
-            taken: 'กินแล้ว', late: 'กินแล้ว (ช้า)',
-            missed: 'พลาด', planned: 'รอกิน', none: 'ไม่มีโดส',
-        };
-        // arrange by week column (7 rows) — first day of grid is start day-of-week aligned
-        data.forEach(d => {
-            const cell = document.createElement('div');
-            cell.className = 'w-4 h-4 rounded-sm ' + (colorMap[d.status] || colorMap.none);
-            cell.title = `${d.date} — ${labelMap[d.status] || d.status}` +
-                (d.total ? ` (${d.taken}/${d.total})` : '');
-            grid.appendChild(cell);
-        });
-    })
-    .catch(() => {});
+fetch('/api/patients/{{ patient.patient_id }}/heatmap-data').then(r=>r.json()).then(data => {
+    const grid = document.getElementById('heatmap');
+    if (!grid || !data) return;
+    if (!data.length) { document.getElementById('heatmapEmpty').classList.remove('hidden'); return; }
+    const colorMap = { taken:'#059669', late:'#34D399', missed:'#DC2626', planned:'#CBD5E1', none:'#F1F5F9' };
+    const labelMap = { taken:'กินแล้ว', late:'กินช้า', missed:'พลาด', planned:'รอกิน', none:'ไม่มี' };
+    data.forEach(d => {
+        const cell = document.createElement('div');
+        cell.style.cssText = `width:18px; height:18px; border-radius:4px; background:${colorMap[d.status]||colorMap.none};`;
+        cell.title = `${d.date} — ${labelMap[d.status]||d.status}` + (d.total ? ` (${d.taken}/${d.total})` : '');
+        grid.appendChild(cell);
+    });
+}).catch(() => {});
 </script>
+{% endblock %}
 {% endblock %}

@@ -1,50 +1,63 @@
 {% extends "base.html" %}
-{% block title %}ประวัติการแจ้งเตือน{% endblock %}
+{% block title %}การแจ้งเตือน{% endblock %}
 {% block content %}
 <div class="space-y-6">
     <div>
-        <h1 class="text-2xl font-bold text-slate-800">ประวัติการแจ้งเตือน LINE</h1>
-        <p class="text-sm text-slate-500 mt-1">ข้อความทั้งหมดที่ระบบส่งถึงผู้ป่วย (200 รายการล่าสุด)</p>
+        <h1 class="text-[22px] font-bold tracking-tight" style="color:#0F1923;">การแจ้งเตือน</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">ประวัติการส่ง LINE ทั้งหมด</p>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="card" style="padding:0;">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold" style="color:#0F1923;">Log การแจ้งเตือน</div>
+                <div class="text-xs mt-0.5" style="color:#8A9BAA;">{{ logs|length }} รายการ</div>
+            </div>
+        </div>
         <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-slate-50">
-                    <tr class="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        <th class="px-4 py-3 text-left">เวลา</th>
-                        <th class="px-4 py-3 text-left">ผู้ป่วย</th>
-                        <th class="px-4 py-3 text-left">ประเภท</th>
-                        <th class="px-4 py-3 text-left">ข้อความ</th>
-                        <th class="px-4 py-3 text-center">ส่ง</th>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>เวลา</th>
+                        <th>ผู้ป่วย</th>
+                        <th>ประเภท</th>
+                        <th>ข้อความ</th>
+                        <th class="text-center">สถานะ</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
-                    {% for l in logs %}
-                    <tr class="hover:bg-slate-50">
-                        <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{{ l.sent_at[:16] if l.sent_at else '-' }}</td>
-                        <td class="px-4 py-3 text-sm">
-                            {% if l.patient_id %}
-                            <a href="/patients/{{ l.patient_id }}" class="font-medium text-indigo-600 hover:text-indigo-800">{{ l.full_name or 'N/A' }}</a>
-                            {% else %}<span class="text-slate-400">—</span>{% endif %}
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td style="color:#8A9BAA; white-space:nowrap; font-size:12px;">
+                            {{ log.sent_at[:16] if log.sent_at else '-' }}
                         </td>
-                        <td class="px-4 py-3">
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-                                {% if l.message_type == 'missed' %}bg-rose-50 text-rose-700
-                                {% elif l.message_type == 'broadcast' %}bg-violet-50 text-violet-700
-                                {% elif l.message_type and l.message_type.startswith('reminder') %}bg-indigo-50 text-indigo-700
-                                {% else %}bg-slate-100 text-slate-600{% endif %}">
-                                {{ l.message_type or 'other' }}
-                            </span>
+                        <td>
+                            <a href="/patients/{{ log.patient_id }}" class="font-semibold hover:underline" style="color:#0F1923; font-size:13px;">
+                                {{ log.full_name or '—' }}
+                            </a>
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-600 max-w-md truncate">{{ l.message_text or '-' }}</td>
-                        <td class="px-4 py-3 text-center text-sm">
-                            {% if l.delivered %}<span class="text-emerald-600">✅</span>{% else %}<span class="text-rose-500">❌</span>{% endif %}
+                        <td>
+                            {% if log.notification_type == 'reminder_1' %}<span class="badge badge-primary">เตือนครั้งที่ 1</span>
+                            {% elif log.notification_type == 'reminder_2' %}<span class="badge badge-warning">เตือนซ้ำ</span>
+                            {% elif log.notification_type == 'missed' %}<span class="badge badge-danger">พลาดยา</span>
+                            {% elif log.notification_type == 'caregiver' %}<span class="badge badge-purple">ผู้ดูแล</span>
+                            {% elif log.notification_type == 'broadcast' %}<span class="badge badge-success">Broadcast</span>
+                            {% else %}<span class="badge badge-default">{{ log.notification_type or '-' }}</span>{% endif %}
+                        </td>
+                        <td style="font-size:13px; color:#4B5E6D; max-width:280px;" class="truncate">
+                            {{ log.message[:80] if log.message else '-' }}{% if log.message and log.message|length > 80 %}…{% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if log.delivered %}
+                                <span class="badge badge-success">ส่งสำเร็จ</span>
+                            {% else %}
+                                <span class="badge badge-danger">ล้มเหลว</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
                     {% if not logs %}
-                    <tr><td colspan="5" class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีการแจ้งเตือน</td></tr>
+                    <tr><td colspan="5" class="text-center py-14" style="color:#8A9BAA;">ยังไม่มีประวัติการแจ้งเตือน</td></tr>
                     {% endif %}
                 </tbody>
             </table>

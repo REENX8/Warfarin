@@ -1,55 +1,52 @@
 {% extends "base.html" %}
-{% block title %}รายงานอาการ{% endblock %}
+{% block title %}อาการผู้ป่วย{% endblock %}
 {% block content %}
 <div class="space-y-6">
     <div>
-        <h1 class="text-2xl font-bold text-slate-800">รายงานอาการไม่พึงประสงค์</h1>
-        <p class="text-sm text-slate-500 mt-1">รวบรวมจากผู้ป่วยผ่านลิงก์ LINE / QR</p>
+        <h1 class="text-[22px] font-bold tracking-tight" style="color:#0F1923;">อาการผู้ป่วย</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">รายงานอาการไม่พึงประสงค์จากผู้ป่วย</p>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-slate-50">
-                    <tr class="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        <th class="px-4 py-3 text-left">วันที่</th>
-                        <th class="px-4 py-3 text-left">ผู้ป่วย</th>
-                        <th class="px-4 py-3 text-left">อาการ</th>
-                        <th class="px-4 py-3 text-center">ระดับ</th>
-                        <th class="px-4 py-3 text-left">อื่น ๆ</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    {% for r in reports %}
-                    <tr class="hover:bg-slate-50">
-                        <td class="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">{{ r.created_at[:16] if r.created_at else r.report_date }}</td>
-                        <td class="px-4 py-3 text-sm">
-                            <a href="/patients/{{ r.patient_id }}" class="font-medium text-indigo-600 hover:text-indigo-800">{{ r.full_name }}</a>
-                            {% if r.hn %}<div class="text-xs text-slate-400">HN: {{ r.hn }}</div>{% endif %}
-                        </td>
-                        <td class="px-4 py-3 text-xs text-slate-600 space-x-1">
-                            {% if r.bleeding %}<span class="inline-block bg-rose-100 text-rose-700 rounded px-2 py-0.5">เลือดออก</span>{% endif %}
-                            {% if r.bruising %}<span class="inline-block bg-purple-100 text-purple-700 rounded px-2 py-0.5">ช้ำ</span>{% endif %}
-                            {% if r.headache %}<span class="inline-block bg-amber-100 text-amber-700 rounded px-2 py-0.5">ปวดหัว</span>{% endif %}
-                            {% if r.dizziness %}<span class="inline-block bg-sky-100 text-sky-700 rounded px-2 py-0.5">เวียนหัว</span>{% endif %}
-                            {% if r.nausea %}<span class="inline-block bg-lime-100 text-lime-700 rounded px-2 py-0.5">คลื่นไส้</span>{% endif %}
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold
-                                {% if r.severity >= 4 %}bg-rose-100 text-rose-700
-                                {% elif r.severity == 3 %}bg-amber-100 text-amber-700
-                                {% else %}bg-emerald-100 text-emerald-700{% endif %}">
-                                {{ r.severity }}/5
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 text-xs text-slate-500">{{ r.other or '-' }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% if not reports %}
-                    <tr><td colspan="5" class="px-6 py-8 text-center text-sm text-slate-400">ยังไม่มีรายงานอาการ</td></tr>
+    <div class="card" style="padding:0;">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold" style="color:#0F1923;">รายงานล่าสุด</div>
+                <div class="text-xs mt-0.5" style="color:#8A9BAA;">{{ symptoms|length }} รายการ</div>
+            </div>
+        </div>
+        <div>
+            {% for s in symptoms %}
+            <div class="px-6 py-4 flex items-start gap-3 {% if not loop.last %}border-b{% endif %} {% if s.severity >= 4 %}bg-rose-50{% endif %}" style="border-color:#E2E8F0;">
+                <a href="/patients/{{ s.patient_id }}" class="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 hover:opacity-80" style="background:#0284C7;">
+                    {{ s.full_name[3:5] if s.full_name|length > 3 else s.full_name[:2] }}
+                </a>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                        <a href="/patients/{{ s.patient_id }}" class="text-[13px] font-semibold hover:underline" style="color:#0F1923;">{{ s.full_name }}</a>
+                        <span class="badge {% if s.severity >= 4 %}badge-danger{% elif s.severity == 3 %}badge-warning{% else %}badge-success{% endif %}">
+                            ระดับ {{ s.severity }}/5
+                        </span>
+                        {% if s.bleeding %}<span class="badge badge-danger">เลือดออก</span>{% endif %}
+                        {% if s.bruising %}<span class="badge badge-purple">ช้ำ</span>{% endif %}
+                        {% if s.headache %}<span class="badge badge-amber">ปวดหัว</span>{% endif %}
+                        {% if s.dizziness %}<span class="badge badge-primary">เวียนหัว</span>{% endif %}
+                        {% if s.nausea %}<span class="badge badge-default">คลื่นไส้</span>{% endif %}
+                    </div>
+                    {% if s.other %}
+                    <div class="text-xs" style="color:#4B5E6D;">หมายเหตุ: {{ s.other }}</div>
                     {% endif %}
-                </tbody>
-            </table>
+                    <div class="text-[11px] mt-1" style="color:#8A9BAA;">{{ s.created_at[:16] if s.created_at else s.report_date }}</div>
+                </div>
+                {% if s.severity >= 4 %}
+                <div class="flex-shrink-0">
+                    <span class="badge badge-danger">⚠ ด่วน</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% if not symptoms %}
+            <div class="text-center py-16 text-sm" style="color:#8A9BAA;">ไม่มีรายงานอาการ</div>
+            {% endif %}
         </div>
     </div>
 </div>

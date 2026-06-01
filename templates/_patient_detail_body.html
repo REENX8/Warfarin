@@ -1,0 +1,245 @@
+{# _patient_detail_body.html — included by patient_detail.html #}
+
+<!-- Today's dose QR -->
+{% if today_dose and today_dose.token_id %}
+<div class="card" style="padding:20px;">
+    <div class="flex flex-col sm:flex-row items-center gap-5">
+        <img src="/qr/{{ today_dose.token_id }}.png" alt="QR" class="w-32 h-32 rounded-lg border" style="border-color:#E2E8F0;">
+        <div class="flex-1 text-center sm:text-left">
+            <div class="text-[11px] font-bold uppercase tracking-wider" style="color:#0284C7;">โดสวันนี้</div>
+            <div class="text-2xl font-bold mt-1" style="color:#0F1923;">{{ today_dose.warfarin_mg }} mg</div>
+            <div class="text-[13px]" style="color:#8A9BAA;">เวลา {{ today_dose.scheduled_time }} น. — {{ today_dose.pill_description or 'ยาวาร์ฟาริน' }}</div>
+            <div class="text-[12px] mt-1.5">สถานะ:
+                {% if today_dose.status == 'taken' %}<span class="badge badge-success">กินแล้ว</span>
+                {% elif today_dose.status == 'late' %}<span class="badge badge-warning">กินช้า</span>
+                {% elif today_dose.status == 'missed' %}<span class="badge badge-danger">พลาด</span>
+                {% else %}<span class="badge badge-default">ยังไม่ยืนยัน</span>{% endif %}
+            </div>
+            <a href="/dose/{{ today_dose.token_id }}" target="_blank" class="inline-block mt-2 text-xs font-medium" style="color:#0284C7;">เปิดลิงก์ยืนยัน →</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Dose Management -->
+<div class="card" style="padding:0;">
+    <div class="card-header">
+        <div class="text-sm font-semibold" style="color:#0F1923;">แผนการกินยา</div>
+        <button onclick="document.getElementById('doseForm').classList.toggle('hidden')" class="text-xs font-medium" style="color:#0284C7;">+ สร้างแผน</button>
+    </div>
+    <div id="doseForm" class="hidden p-6" style="background:#FAFBFC; border-bottom:1px solid #E2E8F0;">
+        <form method="POST" action="/patients/{{ patient.patient_id }}/doses" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div><label class="label">วันเริ่มต้น</label><input type="date" name="start_date" required class="input"></div>
+                <div><label class="label">วันสิ้นสุด</label><input type="date" name="end_date" required class="input"></div>
+                <div><label class="label">เวลากินยา</label><input type="time" name="scheduled_time" value="18:00" class="input"></div>
+            </div>
+            <div><label class="label">ขนาดยาเริ่มต้น (mg)</label><input type="number" step="0.25" name="warfarin_mg" value="2" class="input" style="width:130px;"></div>
+            <div>
+                <label class="label">ขนาดยาตามวัน (mg) — เว้นว่างใช้ค่าเริ่มต้น</label>
+                <div class="grid grid-cols-7 gap-2">
+                    {% for d in ['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'] %}
+                    <div class="text-center">
+                        <span class="text-xs" style="color:#8A9BAA;">{{ d }}</span>
+                        <input type="number" step="0.25" name="dose_day_{{ loop.index0 }}" placeholder="-" class="input text-center mt-1" style="padding:6px;">
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div><label class="label">ลักษณะเม็ดยา</label><input type="text" name="pill_description" placeholder="เช่น เม็ดสีชมพู 1 เม็ด" class="input"></div>
+            <button type="submit" class="btn btn-primary">สร้างแผนยา</button>
+        </form>
+    </div>
+    <!-- Heatmap 90 days -->
+    <div class="px-6 py-4" style="border-bottom:1px solid #E2E8F0; background:#FAFBFC;">
+        <div class="flex items-center justify-between mb-3">
+            <div class="text-xs font-medium" style="color:#4B5E6D;">ภาพรวม 90 วัน</div>
+            <div class="flex items-center gap-3 text-[11px]" style="color:#8A9BAA;">
+                <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#059669;"></span>กินแล้ว</span>
+                <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#34D399;"></span>กินช้า</span>
+                <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#DC2626;"></span>พลาด</span>
+                <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:#CBD5E1;"></span>รอ</span>
+            </div>
+        </div>
+        <div id="heatmap" class="grid gap-1" style="grid-template-rows:repeat(7,18px); grid-auto-flow:column; width:fit-content;"></div>
+        <p id="heatmapEmpty" class="hidden text-center text-sm py-6" style="color:#8A9BAA;">ยังไม่มีข้อมูล</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="data-table">
+            <thead><tr>
+                <th>วันที่</th><th class="text-center">เวลา</th><th class="text-center">ขนาด</th>
+                <th class="hidden sm:table-cell">ลักษณะยา</th><th class="text-center">สถานะ</th>
+                <th class="text-center hidden sm:table-cell">ยืนยัน</th><th class="text-right">จัดการ</th>
+            </tr></thead>
+            <tbody>
+                {% for d in doses %}
+                <tr>
+                    <td>{{ d.scheduled_date }}</td>
+                    <td class="text-center" style="color:#4B5E6D;">{{ d.scheduled_time }}</td>
+                    <td class="text-center font-bold">{{ d.warfarin_mg }} mg</td>
+                    <td class="hidden sm:table-cell text-xs" style="color:#8A9BAA;">{{ d.pill_description or '-' }}</td>
+                    <td class="text-center">
+                        {% if d.status == 'taken' %}<span class="badge badge-success">กินแล้ว</span>
+                        {% elif d.status == 'late' %}<span class="badge badge-warning">กินช้า</span>
+                        {% elif d.status == 'missed' %}<span class="badge badge-danger">พลาด</span>
+                        {% else %}<span class="badge badge-default">รอ</span>{% endif %}
+                    </td>
+                    <td class="text-center text-xs hidden sm:table-cell" style="color:#8A9BAA;">{{ d.confirmed_at[:16] if d.confirmed_at else '-' }}</td>
+                    <td class="text-right whitespace-nowrap text-xs">
+                        {% if d.token_id %}<a href="/dose/{{ d.token_id }}" target="_blank" class="mr-2 font-medium" style="color:#0284C7;">ลิงก์</a>{% endif %}
+                        <form method="POST" action="/doses/{{ d.dose_id }}/override" class="inline">
+                            <select name="status" onchange="if(confirm('เปลี่ยนสถานะโดยเจ้าหน้าที่?'))this.form.submit(); else this.selectedIndex=0;" class="text-xs border rounded px-1.5 py-0.5" style="color:#8A9BAA; border-color:#E2E8F0;">
+                                <option value="">⚙️</option>
+                                <option value="taken">→ กินแล้ว</option>
+                                <option value="late">→ กินช้า</option>
+                                <option value="missed">→ พลาด</option>
+                                <option value="planned">→ รอ</option>
+                            </select>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not doses %}<tr><td colspan="7" class="text-center py-12" style="color:#8A9BAA;">ยังไม่มีแผนยา</td></tr>{% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- INR Chart + Lab Results -->
+<div class="card" style="padding:0;">
+    <div class="card-header">
+        <div>
+            <div class="text-sm font-semibold" style="color:#0F1923;">ผลตรวจ INR</div>
+            <div class="text-xs mt-0.5" style="color:#8A9BAA;">เป้าหมาย {{ patient.target_inr_min }}–{{ patient.target_inr_max }} · TTR {{ ttr }}% · จุดเขียว = ในเป้า</div>
+        </div>
+        <button onclick="document.getElementById('labForm').classList.toggle('hidden')" class="text-xs font-medium" style="color:#0284C7;">+ บันทึกผล</button>
+    </div>
+    <div id="labForm" class="hidden p-6" style="background:#FAFBFC; border-bottom:1px solid #E2E8F0;">
+        <form method="POST" action="/patients/{{ patient.patient_id }}/lab" class="flex flex-wrap items-end gap-3">
+            <div><label class="label">ค่า INR</label><input type="number" step="0.01" name="value" required class="input" style="width:110px;"></div>
+            <div><label class="label">วันที่ตรวจ</label><input type="date" name="test_date" class="input"></div>
+            <div class="flex-1 min-w-[180px]"><label class="label">หมายเหตุ</label><input type="text" name="notes" class="input"></div>
+            <button type="submit" class="btn btn-primary">บันทึก</button>
+        </form>
+    </div>
+    <div class="p-6"><div style="height:240px;"><canvas id="inrChart"></canvas></div></div>
+    {% if labs %}
+    <div class="overflow-x-auto" style="border-top:1px solid #E2E8F0;">
+        <table class="data-table">
+            <thead><tr>
+                <th>วันที่</th><th class="text-center">INR</th><th class="text-center">ผลลัพธ์</th><th>หมายเหตุ</th>
+            </tr></thead>
+            <tbody>
+                {% for l in labs %}
+                <tr>
+                    <td>{{ l.test_date }}</td>
+                    <td class="text-center font-bold {% if l.in_range %}text-emerald-600{% else %}text-rose-600{% endif %}">{{ l.value }}</td>
+                    <td class="text-center"><span class="badge {% if l.in_range %}badge-success{% else %}badge-danger{% endif %}">{% if l.in_range %}ในเป้า{% else %}นอกเป้า{% endif %}</span></td>
+                    <td class="text-xs" style="color:#8A9BAA;">{{ l.notes or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Test Scores -->
+<div class="card" style="padding:0;">
+    <div class="card-header">
+        <div class="text-sm font-semibold" style="color:#0F1923;">คะแนนแบบทดสอบ</div>
+        <button onclick="document.getElementById('scoreForm').classList.toggle('hidden')" class="text-xs font-medium" style="color:#0284C7;">+ บันทึกคะแนน</button>
+    </div>
+    <div id="scoreForm" class="hidden p-6" style="background:#FAFBFC; border-bottom:1px solid #E2E8F0;">
+        <form method="POST" action="/patients/{{ patient.patient_id }}/test-score" class="flex flex-wrap items-end gap-3">
+            <div><label class="label">ประเภท</label>
+                <select name="test_type" class="input" style="width:auto;">
+                    <option value="pre">Pre-test</option><option value="post">Post-test</option>
+                </select>
+            </div>
+            <div><label class="label">คะแนน</label><input type="number" step="0.5" name="score" required class="input" style="width:100px;"></div>
+            <button type="submit" class="btn btn-primary">บันทึก</button>
+        </form>
+    </div>
+    {% if scores %}
+    <div class="overflow-x-auto">
+        <table class="data-table">
+            <thead><tr><th>ประเภท</th><th class="text-center">คะแนน</th><th>วันที่</th></tr></thead>
+            <tbody>
+                {% for s in scores %}
+                <tr>
+                    <td><span class="badge {% if s.test_type == 'pre' %}badge-warning{% else %}badge-success{% endif %}">{{ 'Pre-test' if s.test_type == 'pre' else 'Post-test' }}</span></td>
+                    <td class="text-center font-bold">{{ s.score }}/{{ s.max_score }}</td>
+                    <td style="color:#8A9BAA;">{{ s.taken_at[:10] if s.taken_at else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-sm" style="color:#8A9BAA;">ยังไม่มีผลแบบทดสอบ</div>
+    {% endif %}
+</div>
+
+<!-- Symptom Reports -->
+{% if symptoms %}
+<div class="card" style="padding:0;">
+    <div class="card-header">
+        <div class="text-sm font-semibold" style="color:#0F1923;">รายงานอาการ (10 รายการล่าสุด)</div>
+    </div>
+    <div>
+        {% for s in symptoms %}
+        <div class="px-6 py-3.5 flex items-center gap-3 {% if not loop.last %}border-b{% endif %}" style="border-color:#E2E8F0;">
+            <span class="badge {% if s.severity >= 4 %}badge-danger{% elif s.severity == 3 %}badge-warning{% else %}badge-success{% endif %}">{{ s.severity }}/5</span>
+            <div class="flex-1 text-xs flex flex-wrap gap-1.5" style="color:#4B5E6D;">
+                {% if s.bleeding %}<span class="badge badge-danger">เลือดออก</span>{% endif %}
+                {% if s.bruising %}<span class="badge badge-purple">ช้ำ</span>{% endif %}
+                {% if s.headache %}<span class="badge badge-amber">ปวดหัว</span>{% endif %}
+                {% if s.dizziness %}<span class="badge badge-primary">เวียนหัว</span>{% endif %}
+                {% if s.nausea %}<span class="badge badge-default">คลื่นไส้</span>{% endif %}
+                {% if s.other %}<span style="color:#8A9BAA;">— {{ s.other }}</span>{% endif %}
+            </div>
+            <span class="text-xs" style="color:#8A9BAA; white-space:nowrap;">{{ s.created_at[:16] if s.created_at else s.report_date }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Satisfaction Surveys -->
+{% if surveys %}
+<div class="card" style="padding:0;">
+    <div class="card-header">
+        <div class="text-sm font-semibold" style="color:#0F1923;">ผลแบบสอบถามความพึงพอใจ</div>
+        <a href="/patients/{{ patient.patient_id }}/survey" class="text-xs font-medium" style="color:#7C3AED;">+ เพิ่ม</a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="data-table">
+            <thead><tr>
+                <th>วันที่</th><th class="text-center">ใช้งาน</th>
+                <th class="text-center">LINE</th><th class="text-center">การเตือน</th>
+                <th class="hidden md:table-cell">ความคิดเห็น</th>
+            </tr></thead>
+            <tbody>
+                {% for sv in surveys %}
+                <tr>
+                    <td>{{ sv.survey_date }}</td>
+                    <td class="text-center font-bold">{{ sv.ease_of_use }}/5</td>
+                    <td class="text-center font-bold">{{ sv.line_satisfaction }}/5</td>
+                    <td class="text-center font-bold">{{ sv.reminder_helpful }}/5</td>
+                    <td class="hidden md:table-cell text-sm" style="color:#8A9BAA;">{{ sv.comments or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card flex items-center justify-between" style="padding:18px 22px;">
+    <div>
+        <div class="text-sm font-semibold" style="color:#0F1923;">แบบสอบถามความพึงพอใจ</div>
+        <div class="text-xs mt-0.5" style="color:#8A9BAA;">ยังไม่มีแบบสอบถาม</div>
+    </div>
+    <a href="/patients/{{ patient.patient_id }}/survey" class="btn btn-sm" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE;">+ เพิ่มแบบสอบถาม</a>
+</div>
+{% endif %}

@@ -106,6 +106,45 @@
         </div>
     </div>
 
+    <!-- Critical INR banner -->
+    {% if critical_inr_patients %}
+    <div class="rounded-xl p-4 flex gap-3" style="background:#FFF5F5; border:1px solid #FC8181;">
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="#C53030" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        <div>
+            <div class="text-sm font-bold mb-1" style="color:#C53030;">⚠️ INR วิกฤต — ต้องติดตามทันที</div>
+            <div class="space-y-1">
+                {% for p in critical_inr_patients %}
+                <a href="/patients/{{ p.patient_id }}" class="flex items-center gap-2 text-xs hover:underline" style="color:#9B2C2C;">
+                    <span class="font-semibold">{{ p.full_name }}</span>
+                    <span class="badge {% if p.inr_value < 1.5 %}badge-danger{% else %}badge-danger{% endif %}">
+                        INR {{ p.inr_value }} — {{ 'ต่ำมาก' if p.inr_value < 1.5 else 'สูงมาก' }}
+                    </span>
+                    <span style="color:#B7791F;">วันที่ {{ p.test_date }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Low inventory banner -->
+    {% if low_inventory_patients %}
+    <div class="rounded-xl p-4 flex gap-3" style="background:#FFFBEB; border:1px solid #F6AD55;">
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="#C05621" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        <div>
+            <div class="text-sm font-bold mb-1" style="color:#C05621;">ยาเหลือน้อย — ต้องเติมยา</div>
+            <div class="space-y-0.5">
+                {% for p in low_inventory_patients %}
+                <a href="/patients/{{ p.patient_id }}" class="flex items-center gap-2 text-xs hover:underline" style="color:#7B341E;">
+                    <span class="font-semibold">{{ p.full_name }}</span>
+                    <span class="badge badge-warning">เหลือ {{ p.pill_inventory }} เม็ด</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Two column -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 

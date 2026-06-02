@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}จัดการเจ้าหน้าที่{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h1 class="text-[22px] font-bold tracking-tight" style="color:#0F1923;">จัดการเจ้าหน้าที่</h1>
+            <p class="text-[13px] mt-1" style="color:#8A9BAA;">บัญชีผู้ใช้งานระบบทั้งหมด</p>
+        </div>
+        <a href="/staff/new" class="btn btn-primary">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+            เพิ่มเจ้าหน้าที่
+        </a>
+    </div>
+
+    <div class="card overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+                <tr style="background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
+                    <th class="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wider" style="color:#64748B;">ชื่อผู้ใช้</th>
+                    <th class="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wider" style="color:#64748B;">ชื่อ-สกุล</th>
+                    <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style="color:#64748B;">บทบาท</th>
+                    <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style="color:#64748B;">สถานะ</th>
+                    <th class="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style="color:#64748B;">สร้างเมื่อ</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y" style="divide-color:#F1F5F9;">
+                {% for s in staff_list %}
+                <tr class="hover:bg-slate-50 {% if not s.active %}opacity-50{% endif %}">
+                    <td class="px-6 py-3 font-medium" style="color:#0F1923;">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                                 style="background:{% if s.role == 'admin' %}#7C3AED{% else %}#0284C7{% endif %};">
+                                {{ (s.full_name or s.username)[:1] }}
+                            </div>
+                            {{ s.username }}
+                        </div>
+                    </td>
+                    <td class="px-6 py-3" style="color:#374151;">{{ s.full_name }}</td>
+                    <td class="px-4 py-3">
+                        <span class="badge {% if s.role == 'admin' %}badge-purple{% else %}badge-primary{% endif %}">
+                            {{ 'ผู้ดูแลระบบ' if s.role == 'admin' else 'เจ้าหน้าที่' }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="badge {% if s.active %}badge-success{% else %}badge-danger{% endif %}">
+                            {{ 'ใช้งาน' if s.active else 'ปิดใช้งาน' }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-xs" style="color:#8A9BAA;">{{ s.created_at[:10] if s.created_at else '-' }}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-2 justify-end">
+                            <a href="/staff/{{ s.staff_id }}/edit" class="btn btn-default text-xs px-3 py-1.5">แก้ไข</a>
+                            {% if s.staff_id != user.staff_id %}
+                            <form method="POST" action="/staff/{{ s.staff_id }}/toggle"
+                                  onsubmit="return confirm('{{ 'ปิดการใช้งาน' if s.active else 'เปิดการใช้งาน' }} account นี้?')">
+                                <button type="submit" class="btn text-xs px-3 py-1.5 {% if s.active %}btn-danger{% else %}btn-success{% endif %}">
+                                    {{ 'ปิดใช้งาน' if s.active else 'เปิดใช้งาน' }}
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center py-10" style="color:#94A3B8;">ยังไม่มีข้อมูลเจ้าหน้าที่</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

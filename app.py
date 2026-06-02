@@ -367,6 +367,7 @@ def init_db():
             "ALTER TABLE medication_plan ADD COLUMN confirm_source TEXT DEFAULT 'patient'",
             "ALTER TABLE patients ADD COLUMN pill_inventory INTEGER DEFAULT 0",
             "ALTER TABLE patients ADD COLUMN registration_code TEXT",
+            "ALTER TABLE staff ADD COLUMN active INTEGER DEFAULT 1",
         ]
         for m in migrations:
             try:
@@ -507,6 +508,39 @@ def compute_ttr(conn, patient_id) -> Optional[float]:
     if not total_days:
         return None
     return round(in_range_days / total_days * 100, 1)
+
+_INR_CRITICAL_LOW = 1.5
+_INR_CRITICAL_HIGH = 4.0
+
+def notify_critical_inr(patient_name: str, patient_id: int, inr_value: float, entered_by: str):
+    """ส่ง LINE alert ไปยังผู้ใช้งานที่มี LINE account เมื่อ INR วิกฤต"""
+    direction = "ต่ำมาก" if inr_value < _INR_CRITICAL_LOW else "สูงมาก"
+    msg = (
+        f"🚨 แจ้งเตือน INR วิกฤต\n"
+        f"ผู้ป่วย: {patient_name}\n"
+        f"INR: {inr_value} ({direction})\n"
+        f"บันทึกโดย: {entered_by}\n"
+        f"ดูผู้ป่วย: {BASE_URL}/patients/{patient_id}"
+    )
+    with db() as conn:
+        staff_lines = conn.execute(
+            "SELECT line_user_id FROM patients WHERE line_user_id IS NOT NULL AND line_user_id!='' LIMIT 0"
+        ).fetchall()
+        # ส่งไปยัง staff ที่มี LINE (ใช้ตาราง caregivers สำหรับ staff ที่ไม่มี patient ID)
+        # ในระบบนี้ staff ไม่มี LINE field — ส่งไปยัง caregiver ของผู้ป่วยแทน
+        caregiver = conn.execute(
+            "SELECT line_user_id FROM caregivers WHERE patient_id=? AND notify_enabled=1 "
+            "AND line_user_id IS NOT NULL AND line_user_id!=''",
+            (patient_id,)
+        ).fetchone()
+    if caregiver and caregiver["line_user_id"]:
+        _push_line(caregiver["line_user_id"], msg)
+    # แจ้งผู้ป่วยด้วยถ้ามี LINE
+    with db() as conn:
+        pt = conn.execute("SELECT line_user_id FROM patients WHERE patient_id=?", (patient_id,)).fetchone()
+    if pt and pt["line_user_id"]:
+        _push_line(pt["line_user_id"], msg)
+    logger.warning("Critical INR alert: patient_id=%s value=%s entered_by=%s", patient_id, inr_value, entered_by)
 
 def update_missed_doses(conn):
     """ทำเครื่องหมายโดสที่เลยเวลาแล้วเป็น missed"""
@@ -748,8 +782,10 @@ def login_post(request: Request, username: str = Form(...), password: str = Form
         })
 
     with db() as conn:
-        staff = conn.execute("SELECT * FROM staff WHERE username=?", (username,)).fetchone()
-    if not staff or not _verify_pw(password, staff["password_hash"]):
+        staff = conn.execute(
+            "SELECT *, COALESCE(active,1) as active FROM staff WHERE username=?", (username,)
+        ).fetchone()
+    if not staff or not _verify_pw(password, staff["password_hash"]) or not staff["active"]:
         attempt["count"] += 1
         _login_attempts[ip] = attempt
         return templates.TemplateResponse(request, "login.html", {
@@ -843,6 +879,24 @@ def dashboard(request: Request):
         line_linked = conn.execute(
             "SELECT COUNT(*) c FROM patients WHERE active=1 AND line_user_id IS NOT NULL AND line_user_id!=''"
         ).fetchone()["c"]
+        # ผู้ป่วยที่ INR วิกฤต (ผลล่าสุด < 1.5 หรือ > 4.0)
+        critical_inr_rows = conn.execute(
+            "SELECT p.patient_id, p.full_name, p.hn, lr.value as inr_value, lr.test_date "
+            "FROM patients p "
+            "JOIN lab_results lr ON lr.result_id = ("
+            "  SELECT result_id FROM lab_results WHERE patient_id=p.patient_id "
+            "  ORDER BY test_date DESC, result_id DESC LIMIT 1"
+            ") "
+            "WHERE p.active=1 AND (lr.value < ? OR lr.value > ?) "
+            "ORDER BY lr.test_date DESC LIMIT 10",
+            (_INR_CRITICAL_LOW, _INR_CRITICAL_HIGH),
+        ).fetchall()
+        # ผู้ป่วยที่ยายังเหลือน้อย (< 7 เม็ด)
+        low_inventory_rows = conn.execute(
+            "SELECT patient_id, full_name, hn, pill_inventory FROM patients "
+            "WHERE active=1 AND pill_inventory IS NOT NULL AND pill_inventory < 7 AND pill_inventory >= 0 "
+            "ORDER BY pill_inventory ASC LIMIT 10"
+        ).fetchall()
     return templates.TemplateResponse(request, "dashboard.html", {
         "user": user, "total_patients": total_patients,
         "active_patients": active_patients, "today_taken": today_taken,
@@ -852,6 +906,8 @@ def dashboard(request: Request):
         "urgent_symptoms": [dict(s) for s in urgent_symptoms],
         "line_linked": line_linked,
         "line_configured": bool(line_api),
+        "critical_inr_patients": [dict(r) for r in critical_inr_rows],
+        "low_inventory_patients": [dict(r) for r in low_inventory_rows],
     })
 
 # ---------------------------------------------------------------------------
@@ -1110,15 +1166,26 @@ async def add_lab(request: Request, pid: int):
     if not user:
         return RedirectResponse("/login", status_code=303)
     form = await request.form()
-    value = float(form["value"])
+    try:
+        value = float(form["value"])
+    except (ValueError, KeyError):
+        raise HTTPException(400, "ค่า INR ต้องเป็นตัวเลข")
+    if not (0.1 <= value <= 15.0):
+        raise HTTPException(400, f"ค่า INR ({value}) อยู่นอกช่วงที่ยอมรับได้ (0.1–15.0)")
     with db() as conn:
-        pt = conn.execute("SELECT target_inr_min, target_inr_max FROM patients WHERE patient_id=?", (pid,)).fetchone()
-        in_range = 1 if pt and pt["target_inr_min"] <= value <= pt["target_inr_max"] else 0
+        pt = conn.execute("SELECT * FROM patients WHERE patient_id=?", (pid,)).fetchone()
+        if not pt:
+            raise HTTPException(404, "ไม่พบผู้ป่วย")
+        in_range = 1 if pt["target_inr_min"] <= value <= pt["target_inr_max"] else 0
+        is_critical = value < _INR_CRITICAL_LOW or value > _INR_CRITICAL_HIGH
         conn.execute(
             "INSERT INTO lab_results (patient_id,lab_name,value,test_date,in_range,notes,created_at) VALUES(?,?,?,?,?,?,?)",
             (pid, form.get("lab_name", "INR"), value, form.get("test_date", _today()), in_range, form.get("notes", ""), _now()),
         )
-        log_audit(conn, "add_lab", "lab_results", pid, user["username"], f"INR={value} in_range={in_range}")
+        log_audit(conn, "add_lab", "lab_results", pid, user["username"],
+                  f"INR={value} in_range={in_range} critical={is_critical}")
+    if is_critical:
+        notify_critical_inr(pt["full_name"], pid, value, user["username"])
     return RedirectResponse(f"/patients/{pid}", status_code=303)
 
 @app.post("/patients/{pid}/test-score")
@@ -2411,6 +2478,265 @@ def api_dashboard_stats(request: Request):
         pending = conn.execute("SELECT COUNT(*) c FROM medication_plan WHERE scheduled_date=? AND status='planned'", (today,)).fetchone()["c"]
         active = conn.execute("SELECT COUNT(*) c FROM patients WHERE active=1").fetchone()["c"]
     return {"today_taken": taken, "today_missed": missed, "today_pending": pending, "active_patients": active}
+
+# ---------------------------------------------------------------------------
+# Routes: Staff management (admin only)
+# ---------------------------------------------------------------------------
+@app.get("/staff")
+def staff_list(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    if user.get("role") != "admin":
+        raise HTTPException(403, "เฉพาะผู้ดูแลระบบเท่านั้น")
+    with db() as conn:
+        staff_rows = conn.execute(
+            "SELECT staff_id, username, full_name, role, created_at, "
+            "COALESCE(active, 1) as active FROM staff ORDER BY role DESC, username"
+        ).fetchall()
+    return templates.TemplateResponse(request, "staff.html", {
+        "user": user, "staff_list": [dict(s) for s in staff_rows]
+    })
+
+@app.get("/staff/new")
+def staff_new_form(request: Request):
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "เฉพาะผู้ดูแลระบบเท่านั้น")
+    return templates.TemplateResponse(request, "staff_form.html", {
+        "user": user, "staff": None, "error": ""
+    })
+
+@app.post("/staff/new")
+async def staff_create(request: Request):
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "เฉพาะผู้ดูแลระบบเท่านั้น")
+    form = await request.form()
+    username = (form.get("username") or "").strip()
+    full_name = (form.get("full_name") or "").strip()
+    role = form.get("role", "staff")
+    password = form.get("password", "")
+    if not username or not full_name or not password:
+        return templates.TemplateResponse(request, "staff_form.html", {
+            "user": user, "staff": None,
+            "error": "กรุณากรอกข้อมูลให้ครบ (ชื่อผู้ใช้, ชื่อ-สกุล, รหัสผ่าน)"
+        })
+    if len(password) < 8:
+        return templates.TemplateResponse(request, "staff_form.html", {
+            "user": user, "staff": None,
+            "error": "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"
+        })
+    if role not in ("admin", "staff"):
+        role = "staff"
+    try:
+        with db() as conn:
+            conn.execute(
+                "INSERT INTO staff (username, password_hash, full_name, role, created_at, active) VALUES(?,?,?,?,?,1)",
+                (username, _hash_pw(password), full_name, role, _now()),
+            )
+            sid = conn.execute("SELECT last_insert_rowid() id").fetchone()["id"]
+            log_audit(conn, "create_staff", "staff", sid, user["username"], f"สร้าง staff: {username}")
+    except sqlite3.IntegrityError:
+        return templates.TemplateResponse(request, "staff_form.html", {
+            "user": user, "staff": None,
+            "error": f"ชื่อผู้ใช้ '{username}' ถูกใช้งานแล้ว"
+        })
+    return RedirectResponse("/staff", status_code=303)
+
+@app.get("/staff/{sid}/edit")
+def staff_edit_form(request: Request, sid: int):
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "เฉพาะผู้ดูแลระบบเท่านั้น")
+    with db() as conn:
+        s = conn.execute(
+            "SELECT staff_id, username, full_name, role, COALESCE(active,1) as active FROM staff WHERE staff_id=?",
+            (sid,)
+        ).fetchone()
+    if not s:
+        raise HTTPException(404, "ไม่พบข้อมูลเจ้าหน้าที่")
+    return templates.TemplateResponse(request, "staff_form.html", {
+        "user": user, "staff": dict(s), "error": ""
+    })
+
+@app.post("/staff/{sid}/edit")
+async def staff_update(request: Request, sid: int):
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "เฉพาะผู้ดูแลระบบเท่านั้น")
+    form = await request.form()
+    full_name = (form.get("full_name") or "").strip()
+    role = form.get("role", "staff")
+    new_password = (form.get("new_password") or "").strip()
+    if not full_name:
+        with db() as conn:
+            s = conn.execute("SELECT * FROM staff WHERE staff_id=?", (sid,)).fetchone()
+        return templates.TemplateResponse(request, "staff_form.html", {
+            "user": user, "staff": dict(s) if s else None,
+            "error": "กรุณากรอกชื่อ-สกุล"
+        })
+    if role not in ("admin", "staff"):
+        role = "staff"
+    with db() as conn:
+        if new_password:
+            if len(new_password) < 8:
+                s = conn.execute("SELECT * FROM staff WHERE staff_id=?", (sid,)).fetchone()
+                return templates.TemplateResponse(request, "staff_form.html", {
+                    "user": user, "staff": dict(s) if s else None,
+                    "error": "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"
+                })
+            conn.execute("UPDATE staff SET full_name=?, role=?, password_hash=? WHERE staff_id=?",
+                         (full_name, role, _hash_pw(new_password), sid))
+        else:
+            conn.execute("UPDATE staff SET full_name=?, role=? WHERE staff_id=?",
+                         (full_name, role, sid))
+        log_audit(conn, "update_staff", "staff", sid, user["username"],
+                  f"อัพเดต staff {sid}: role={role}")
+    return RedirectResponse("/staff", status_code=303)
+
+@app.post("/staff/{sid}/toggle")
+async def staff_toggle_active(request: Request, sid: int):
+    """เปิด/ปิดการใช้งาน staff account"""
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "เฉพาะผู้ดูแลระบบเท่านั้น")
+    if sid == user.get("staff_id"):
+        raise HTTPException(400, "ไม่สามารถปิดการใช้งาน account ของตัวเองได้")
+    with db() as conn:
+        s = conn.execute("SELECT COALESCE(active,1) as active FROM staff WHERE staff_id=?", (sid,)).fetchone()
+        if not s:
+            raise HTTPException(404, "ไม่พบข้อมูลเจ้าหน้าที่")
+        new_active = 0 if s["active"] else 1
+        conn.execute("UPDATE staff SET active=? WHERE staff_id=?", (new_active, sid))
+        log_audit(conn, "toggle_staff", "staff", sid, user["username"],
+                  f"{'เปิด' if new_active else 'ปิด'}การใช้งาน staff {sid}")
+    return RedirectResponse("/staff", status_code=303)
+
+# ---------------------------------------------------------------------------
+# Routes: Password change (self-service)
+# ---------------------------------------------------------------------------
+@app.get("/profile/password")
+def password_change_form(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(request, "password_change.html", {
+        "user": user, "error": "", "success": ""
+    })
+
+@app.post("/profile/password")
+async def password_change(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    form = await request.form()
+    current_pw = form.get("current_password", "")
+    new_pw = form.get("new_password", "")
+    confirm_pw = form.get("confirm_password", "")
+    if not current_pw or not new_pw or not confirm_pw:
+        return templates.TemplateResponse(request, "password_change.html", {
+            "user": user, "error": "กรุณากรอกข้อมูลให้ครบ", "success": ""
+        })
+    if new_pw != confirm_pw:
+        return templates.TemplateResponse(request, "password_change.html", {
+            "user": user, "error": "รหัสผ่านใหม่ไม่ตรงกัน", "success": ""
+        })
+    if len(new_pw) < 8:
+        return templates.TemplateResponse(request, "password_change.html", {
+            "user": user, "error": "รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 8 ตัวอักษร", "success": ""
+        })
+    with db() as conn:
+        s = conn.execute("SELECT * FROM staff WHERE staff_id=?", (user["staff_id"],)).fetchone()
+    if not s or not _verify_pw(current_pw, s["password_hash"]):
+        return templates.TemplateResponse(request, "password_change.html", {
+            "user": user, "error": "รหัสผ่านปัจจุบันไม่ถูกต้อง", "success": ""
+        })
+    with db() as conn:
+        conn.execute("UPDATE staff SET password_hash=? WHERE staff_id=?",
+                     (_hash_pw(new_pw), user["staff_id"]))
+        log_audit(conn, "change_password", "staff", user["staff_id"],
+                  user["username"], "เปลี่ยนรหัสผ่าน")
+    return templates.TemplateResponse(request, "password_change.html", {
+        "user": user, "error": "", "success": "เปลี่ยนรหัสผ่านสำเร็จแล้ว"
+    })
+
+# ---------------------------------------------------------------------------
+# Routes: Data retention / PDPA (admin only)
+# ---------------------------------------------------------------------------
+@app.get("/admin/retention")
+def retention_page(request: Request):
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "เฉพาะผู้ดูแลระบบเท่านั้น")
+    cutoff_5yr = (_now_dt() - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
+    with db() as conn:
+        inactive_old = conn.execute(
+            "SELECT COUNT(*) c FROM patients WHERE active=0 AND updated_at < ?", (cutoff_5yr,)
+        ).fetchone()["c"]
+        old_logs = conn.execute(
+            "SELECT COUNT(*) c FROM audit_log WHERE created_at < ?", (cutoff_5yr,)
+        ).fetchone()["c"]
+        old_notifications = conn.execute(
+            "SELECT COUNT(*) c FROM notification_log WHERE sent_at < ?", (cutoff_5yr,)
+        ).fetchone()["c"]
+    return templates.TemplateResponse(request, "retention.html", {
+        "user": user,
+        "inactive_old_count": inactive_old,
+        "old_logs_count": old_logs,
+        "old_notifications_count": old_notifications,
+        "cutoff_year": cutoff_5yr[:4],
+    })
+
+@app.post("/admin/retention/export")
+async def retention_export(request: Request):
+    """Export inactive patients older than 5 years as CSV"""
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "เฉพาะผู้ดูแลระบบเท่านั้น")
+    cutoff_5yr = (_now_dt() - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT patient_id, hn, full_name, birth_date, phone, diagnosis, "
+            "created_at, updated_at FROM patients WHERE active=0 AND updated_at < ?",
+            (cutoff_5yr,)
+        ).fetchall()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["patient_id", "hn", "full_name", "birth_date", "phone",
+                     "diagnosis", "created_at", "updated_at"])
+    for r in rows:
+        writer.writerow([r["patient_id"], r["hn"], r["full_name"], r["birth_date"],
+                         r["phone"], r["diagnosis"], r["created_at"], r["updated_at"]])
+    output.seek(0)
+    log_audit_direct(user, "export_retention", "patients", 0, f"export {len(rows)} inactive records")
+    filename = f"retention_export_{_today()}.csv"
+    return StreamingResponse(
+        io.BytesIO(("﻿" + output.getvalue()).encode("utf-8")),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+@app.post("/admin/retention/purge")
+async def retention_purge(request: Request):
+    """Delete audit/notification logs older than 5 years"""
+    user = get_current_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(403, "เฉพาะผู้ดูแลระบบเท่านั้น")
+    form = await request.form()
+    if form.get("confirm") != "DELETE":
+        raise HTTPException(400, "ต้องยืนยัน DELETE ก่อน")
+    cutoff_5yr = (_now_dt() - timedelta(days=5 * 365)).isoformat()
+    with db() as conn:
+        n_audit = conn.execute("DELETE FROM audit_log WHERE created_at < ?", (cutoff_5yr,)).rowcount
+        n_notif = conn.execute("DELETE FROM notification_log WHERE sent_at < ?", (cutoff_5yr,)).rowcount
+        log_audit(conn, "purge_logs", "audit_log", 0, user["username"],
+                  f"ลบ audit {n_audit} รายการ, notification {n_notif} รายการ")
+    return RedirectResponse(f"/admin/retention?purged={n_audit + n_notif}", status_code=303)
+
+def log_audit_direct(user: dict, action: str, entity_type: str, entity_id: int, details: str = ""):
+    with db() as conn:
+        log_audit(conn, action, entity_type, entity_id, user["username"], details)
 
 # ---------------------------------------------------------------------------
 # Run with: uvicorn app:app --host 0.0.0.0 --port 8000

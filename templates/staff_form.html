@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ 'แก้ไขเจ้าหน้าที่' if staff else 'เพิ่มเจ้าหน้าที่ใหม่' }}{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto space-y-5">
+
+    <div>
+        <a href="/staff" class="text-sm font-medium" style="color:#0284C7;">&larr; กลับรายการเจ้าหน้าที่</a>
+        <h1 class="text-xl font-bold mt-2" style="color:#0F1923;">
+            {{ 'แก้ไขข้อมูลเจ้าหน้าที่' if staff else 'เพิ่มเจ้าหน้าที่ใหม่' }}
+        </h1>
+    </div>
+
+    {% if error %}
+    <div class="rounded-lg p-4 text-sm font-medium" style="background:#FEF2F2; color:#991B1B; border:1px solid #FECACA;">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ '/staff/' ~ staff.staff_id ~ '/edit' if staff else '/staff/new' }}"
+          class="card p-6 space-y-5">
+
+        {% if not staff %}
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color:#374151;">ชื่อผู้ใช้ <span style="color:#DC2626;">*</span></label>
+            <input type="text" name="username" required
+                   class="w-full rounded-lg border px-3 py-2.5 text-sm" style="border-color:#CBD5E1;"
+                   placeholder="เช่น nurse01">
+        </div>
+        {% else %}
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color:#374151;">ชื่อผู้ใช้</label>
+            <div class="rounded-lg px-3 py-2.5 text-sm font-medium" style="background:#F8FAFC; color:#6B7280;">
+                {{ staff.username }}
+            </div>
+        </div>
+        {% endif %}
+
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color:#374151;">ชื่อ-สกุล <span style="color:#DC2626;">*</span></label>
+            <input type="text" name="full_name" required
+                   value="{{ staff.full_name if staff else '' }}"
+                   class="w-full rounded-lg border px-3 py-2.5 text-sm" style="border-color:#CBD5E1;"
+                   placeholder="ชื่อที่แสดงในระบบ">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color:#374151;">บทบาท</label>
+            <select name="role" class="w-full rounded-lg border px-3 py-2.5 text-sm" style="border-color:#CBD5E1;">
+                <option value="staff" {% if not staff or staff.role == 'staff' %}selected{% endif %}>เจ้าหน้าที่</option>
+                <option value="admin" {% if staff and staff.role == 'admin' %}selected{% endif %}>ผู้ดูแลระบบ</option>
+            </select>
+        </div>
+
+        {% if not staff %}
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color:#374151;">รหัสผ่าน <span style="color:#DC2626;">*</span></label>
+            <input type="password" name="password" required minlength="8"
+                   class="w-full rounded-lg border px-3 py-2.5 text-sm" style="border-color:#CBD5E1;"
+                   placeholder="อย่างน้อย 8 ตัวอักษร">
+        </div>
+        {% else %}
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color:#374151;">รหัสผ่านใหม่ <span class="text-xs font-normal" style="color:#94A3B8;">(เว้นว่างถ้าไม่ต้องการเปลี่ยน)</span></label>
+            <input type="password" name="new_password" minlength="8"
+                   class="w-full rounded-lg border px-3 py-2.5 text-sm" style="border-color:#CBD5E1;"
+                   placeholder="อย่างน้อย 8 ตัวอักษร">
+        </div>
+        {% endif %}
+
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="btn btn-primary flex-1 justify-center">
+                {{ 'บันทึกการแก้ไข' if staff else 'สร้างบัญชีผู้ใช้' }}
+            </button>
+            <a href="/staff" class="btn text-sm px-4 py-2" style="background:#F1F5F9; color:#374151;">ยกเลิก</a>
+        </div>
+    </form>
+
+</div>
+{% endblock %}

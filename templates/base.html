@@ -171,6 +171,21 @@
                 const p = link.dataset.path;
                 if (p && path.startsWith(p)) link.classList.add('active');
             });
+            // CSRF: inject hidden token into all POST forms
+            const csrfToken = '{{ request.state.csrf_token | default("") }}';
+            if (csrfToken) {
+                document.querySelectorAll('form').forEach(form => {
+                    if (form.method && form.method.toUpperCase() === 'POST') {
+                        if (!form.querySelector('[name="csrf_token"]')) {
+                            const inp = document.createElement('input');
+                            inp.type = 'hidden';
+                            inp.name = 'csrf_token';
+                            inp.value = csrfToken;
+                            form.appendChild(inp);
+                        }
+                    }
+                });
+            }
         });
     </script>
     {% block extra_js %}{% endblock %}

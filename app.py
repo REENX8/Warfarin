@@ -1,17 +1,36 @@
 """ระบบติดตามการกินยาวาร์ฟาริน — Sukhirin Padee Hospital, Narathiwat"""
 
-import os, sqlite3, uuid, hashlib, hmac, base64, json, csv, io
+import os, sqlite3, uuid, hashlib, hmac, base64, json, csv, io, secrets, logging
 from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager, asynccontextmanager
 from zoneinfo import ZoneInfo
 from typing import Optional
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+logger = logging.getLogger("warfarin")
 
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse, HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
+
+# bcrypt for password hashing (strong KDF)
+try:
+    import bcrypt as _bcrypt
+    BCRYPT_AVAILABLE = True
+except ImportError:
+    BCRYPT_AVAILABLE = False
+    logger.warning("bcrypt not installed — falling back to SHA256. Install bcrypt for production.")
 
 # QR Code (optional — fail gracefully if unavailable)
 try:
@@ -72,12 +91,15 @@ _rich_menu_id: str | None = None
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-SECRET_KEY = os.getenv("SECRET_KEY", "warfarin-tracker-secret-2024")
-# ⚠️ ไม่มีการฝังค่าเริ่มต้นของ LINE channel secret ใน code — ต้องกำหนดผ่าน env
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY environment variable is required. Set it in .env or deployment config.")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000").rstrip("/")
 DB_PATH = os.getenv("DB_PATH", "./medtrack.db")
+# Allowed origin for CORS — set via CORS_ORIGIN env var; defaults to BASE_URL
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", BASE_URL)
 
 TZ = ZoneInfo("Asia/Bangkok")
 
@@ -101,7 +123,7 @@ async def lifespan(app: FastAPI):
     try:
         _create_rich_menu()
     except Exception as _e:
-        print(f"[WARN] Rich menu setup skipped: {_e}")
+        logger.warning("Rich menu setup skipped: %s", _e)
     yield
     if scheduler.running:
         scheduler.shutdown(wait=False)
@@ -110,13 +132,74 @@ async def lifespan(app: FastAPI):
 # App setup
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Warfarin Medication Tracker", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
+
+# CORS — restrict to configured origin only
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[CORS_ORIGIN],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+    allow_credentials=True,
+)
+
+# Security headers middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CSRF middleware — verify token on authenticated POST requests
+_CSRF_EXEMPT_PATHS = {"/webhook", "/login"}
+_CSRF_EXEMPT_PREFIXES = ("/dose/", "/report/symptom/", "/api/")
+
+class CSRFMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method == "POST":
+            path = request.url.path
+            is_exempt = (
+                path in _CSRF_EXEMPT_PATHS
+                or any(path.startswith(p) for p in _CSRF_EXEMPT_PREFIXES)
+            )
+            if not is_exempt:
+                sid = request.cookies.get("session_id")
+                if sid and sid in SESSIONS:
+                    body = await request.body()
+                    request._body = body  # cache so FastAPI can re-read
+                    ct = request.headers.get("content-type", "")
+                    token = ""
+                    if "application/x-www-form-urlencoded" in ct:
+                        from urllib.parse import parse_qs
+                        params = parse_qs(body.decode(errors="replace"))
+                        token = params.get("csrf_token", [""])[0]
+                    expected = SESSIONS.get(sid, {}).get("csrf_token", "")
+                    if expected and token != expected:
+                        logger.warning("CSRF validation failed for %s %s", request.method, path)
+                        return Response("CSRF validation failed", status_code=403)
+        return await call_next(request)
+
+app.add_middleware(CSRFMiddleware)
+
+# Attach CSRF token to request.state for templates
+@app.middleware("http")
+async def attach_csrf_state(request: Request, call_next):
+    sid = request.cookies.get("session_id")
+    if sid and sid in SESSIONS:
+        request.state.csrf_token = SESSIONS[sid].get("csrf_token", "")
+    else:
+        request.state.csrf_token = ""
+    return await call_next(request)
 
 os.makedirs("templates", exist_ok=True)
 os.makedirs("static", exist_ok=True)
 templates = Jinja2Templates(directory="templates")
-templates.env.cache = None
-templates.env.cache_size = 0
+templates.env.autoescape = True  # enable XSS protection
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 SESSIONS: dict[str, dict] = {}
@@ -163,7 +246,20 @@ def _now_dt() -> datetime:
     return datetime.now(TZ).replace(tzinfo=None)
 
 def _hash_pw(pw: str) -> str:
+    """Hash password with bcrypt (preferred) or SHA256 legacy fallback."""
+    if BCRYPT_AVAILABLE:
+        return _bcrypt.hashpw(pw.encode(), _bcrypt.gensalt()).decode()
     return hashlib.sha256((pw + SECRET_KEY).encode()).hexdigest()
+
+def _verify_pw(pw: str, stored_hash: str) -> bool:
+    """Verify password; handles both bcrypt and legacy SHA256 hashes."""
+    if BCRYPT_AVAILABLE and stored_hash.startswith("$2"):
+        try:
+            return _bcrypt.checkpw(pw.encode(), stored_hash.encode())
+        except Exception:
+            return False
+    # Legacy SHA256 check
+    return hmac.compare_digest(hashlib.sha256((pw + SECRET_KEY).encode()).hexdigest(), stored_hash)
 
 def init_db():
     with db() as conn:
@@ -253,6 +349,17 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_lab_patient_date ON lab_results(patient_id, test_date);
         CREATE INDEX IF NOT EXISTS idx_patients_line ON patients(line_user_id);
         CREATE INDEX IF NOT EXISTS idx_symptom_patient ON symptom_reports(patient_id, report_date);
+        CREATE TABLE IF NOT EXISTS sessions (
+            session_id TEXT PRIMARY KEY,
+            staff_id INTEGER,
+            username TEXT,
+            full_name TEXT,
+            role TEXT,
+            csrf_token TEXT,
+            created_at TEXT,
+            last_seen TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at);
         """)
         # Migration — columns added in later versions
         migrations = [
@@ -282,9 +389,27 @@ _login_attempts: dict[str, dict] = {}
 
 def get_current_user(request: Request) -> Optional[dict]:
     sid = request.cookies.get("session_id")
-    if sid and sid in SESSIONS:
+    if not sid:
+        return None
+    if sid in SESSIONS:
         return SESSIONS[sid]
-    return None
+    # Restore session from DB after restart
+    with db() as conn:
+        row = conn.execute("SELECT * FROM sessions WHERE session_id=?", (sid,)).fetchone()
+        if not row:
+            return None
+        cutoff = (_now_dt() - timedelta(hours=24)).isoformat()
+        if row["created_at"] < cutoff:
+            conn.execute("DELETE FROM sessions WHERE session_id=?", (sid,))
+            return None
+        session_data = {
+            "staff_id": row["staff_id"], "username": row["username"],
+            "full_name": row["full_name"], "role": row["role"],
+            "csrf_token": row["csrf_token"],
+            "created_at": datetime.fromisoformat(row["created_at"]),
+        }
+        SESSIONS[sid] = session_data
+        return session_data
 
 def require_login(request: Request):
     user = get_current_user(request)
@@ -403,7 +528,7 @@ def _push_line(user_id: str, text: str) -> bool:
         ))
         return True
     except Exception as e:
-        print(f"[LINE push error] {user_id[:8]}... → {e}")
+        logger.error("LINE push failed for %s: %s", user_id[:8], e)
         return False
 
 def _push_line_multi(user_id: str, texts: list[str]) -> bool:
@@ -414,7 +539,7 @@ def _push_line_multi(user_id: str, texts: list[str]) -> bool:
         line_api.push_message(PushMessageRequest(to=user_id, messages=msgs))
         return True
     except Exception as e:
-        print(f"[LINE push-multi error] {e}")
+        logger.error("LINE push-multi failed: %s", e)
         return False
 
 def _log_notification(conn, patient_id, dose_id, msg_type, text, delivered):
@@ -557,7 +682,7 @@ def job_mark_missed():
         try:
             send_line_missed_alert(dict(row))
         except Exception as e:
-            print(f"[WARN] missed alert failed for patient {row['patient_id']}: {e}")
+            logger.warning("Missed alert failed for patient %s: %s", row["patient_id"], e)
         with db() as conn:
             _log_notification(conn, row["patient_id"], row["dose_id"], "missed",
                               "แจ้งเตือนลืมกินยา", True)
@@ -569,11 +694,30 @@ def job_cleanup_sessions():
     expired = [sid for sid, s in SESSIONS.items() if s.get("created_at", _now_dt()) < cutoff]
     for sid in expired:
         SESSIONS.pop(sid, None)
+    # Delete expired sessions from DB
+    with db() as conn:
+        conn.execute("DELETE FROM sessions WHERE created_at < ?", (cutoff.isoformat(),))
     # clean login attempts เก่ากว่า 1 ชม.
     attempt_cutoff = _now_dt() - timedelta(hours=1)
     stale = [ip for ip, a in _login_attempts.items() if a.get("window_start", _now_dt()) < attempt_cutoff]
     for ip in stale:
         _login_attempts.pop(ip, None)
+
+# ---------------------------------------------------------------------------
+# Routes: Health checks
+# ---------------------------------------------------------------------------
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "timestamp": _now()}
+
+@app.get("/ready")
+def readiness_check():
+    try:
+        with db() as conn:
+            conn.execute("SELECT 1")
+        return {"status": "ready", "db": "ok"}
+    except Exception as e:
+        raise HTTPException(503, f"DB unavailable: {e}")
 
 # ---------------------------------------------------------------------------
 # Routes: Auth
@@ -605,7 +749,7 @@ def login_post(request: Request, username: str = Form(...), password: str = Form
 
     with db() as conn:
         staff = conn.execute("SELECT * FROM staff WHERE username=?", (username,)).fetchone()
-    if not staff or staff["password_hash"] != _hash_pw(password):
+    if not staff or not _verify_pw(password, staff["password_hash"]):
         attempt["count"] += 1
         _login_attempts[ip] = attempt
         return templates.TemplateResponse(request, "login.html", {
@@ -613,22 +757,43 @@ def login_post(request: Request, username: str = Form(...), password: str = Form
             "current_year": now.year,
         })
 
+    # Migrate legacy SHA256 hash to bcrypt on successful login
+    if BCRYPT_AVAILABLE and not staff["password_hash"].startswith("$2"):
+        new_hash = _hash_pw(password)
+        with db() as conn:
+            conn.execute("UPDATE staff SET password_hash=? WHERE staff_id=?",
+                         (new_hash, staff["staff_id"]))
+
     _login_attempts.pop(ip, None)
     sid = str(uuid.uuid4())
-    SESSIONS[sid] = {
+    csrf_token = secrets.token_hex(16)
+    now_iso = _now()
+    session_data = {
         "staff_id": staff["staff_id"], "username": staff["username"],
         "full_name": staff["full_name"], "role": staff["role"],
+        "csrf_token": csrf_token,
         "created_at": _now_dt(),
     }
+    SESSIONS[sid] = session_data
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO sessions (session_id,staff_id,username,full_name,role,csrf_token,created_at,last_seen) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (sid, staff["staff_id"], staff["username"], staff["full_name"],
+             staff["role"], csrf_token, now_iso, now_iso),
+        )
+    is_https = BASE_URL.startswith("https://")
     resp = RedirectResponse("/dashboard", status_code=303)
-    resp.set_cookie("session_id", sid, httponly=True, samesite="lax")
+    resp.set_cookie("session_id", sid, httponly=True, samesite="lax", secure=is_https)
     return resp
 
 @app.get("/logout")
 def logout(request: Request):
     sid = request.cookies.get("session_id")
-    if sid and sid in SESSIONS:
-        del SESSIONS[sid]
+    if sid:
+        SESSIONS.pop(sid, None)
+        with db() as conn:
+            conn.execute("DELETE FROM sessions WHERE session_id=?", (sid,))
     resp = RedirectResponse("/login", status_code=303)
     resp.delete_cookie("session_id")
     return resp
@@ -1207,7 +1372,7 @@ async def line_webhook(request: Request):
     try:
         line_handler.handle(body.decode("utf-8"), sig)
     except Exception as e:
-        print(f"[LINE webhook error] {e}")
+        logger.error("LINE webhook error: %s", e)
         # ยังตอบ 200 เพื่อไม่ให้ retry
     return JSONResponse({"status": "ok"})
 
@@ -1721,7 +1886,9 @@ def _get_education_text() -> str:
 # API endpoints (JSON for AJAX / Chart.js)
 # ---------------------------------------------------------------------------
 @app.get("/api/patients/{pid}/inr-data")
-def api_inr_data(pid: int):
+def api_inr_data(request: Request, pid: int):
+    if not get_current_user(request):
+        raise HTTPException(401, "Unauthorized")
     with db() as conn:
         rows = conn.execute(
             "SELECT test_date as date, value, in_range FROM lab_results WHERE patient_id=? ORDER BY test_date",
@@ -1730,7 +1897,9 @@ def api_inr_data(pid: int):
     return [dict(r) for r in rows]
 
 @app.get("/api/patients/{pid}/adherence-data")
-def api_adherence_data(pid: int):
+def api_adherence_data(request: Request, pid: int):
+    if not get_current_user(request):
+        raise HTTPException(401, "Unauthorized")
     with db() as conn:
         since = (_now_dt() - timedelta(days=30)).strftime("%Y-%m-%d")
         rows = conn.execute(
@@ -1753,9 +1922,11 @@ def api_adherence_data(pid: int):
     return result
 
 @app.get("/api/patients/{pid}/heatmap-data")
-def api_heatmap_data(pid: int):
+def api_heatmap_data(request: Request, pid: int):
     """90-day adherence heatmap — return [{date, status, total, taken}, ...]
     status priority: missed > planned > late > taken; วันไม่มี dose = 'none'"""
+    if not get_current_user(request):
+        raise HTTPException(401, "Unauthorized")
     today = _now_dt().date()
     start = today - timedelta(days=89)
     with db() as conn:
@@ -2191,9 +2362,9 @@ def _create_rich_menu() -> None:
         )
         line_api.set_default_rich_menu(rich_menu_id=menu_id)
         _rich_menu_id = menu_id
-        print(f"[INFO] Rich menu created: {menu_id}")
+        logger.info("Rich menu created: %s", menu_id)
     except Exception as e:
-        print(f"[WARN] Rich menu creation failed: {e}")
+        logger.warning("Rich menu creation failed: %s", e)
 
 @app.post("/line/rich-menu/refresh")
 async def refresh_rich_menu(request: Request):

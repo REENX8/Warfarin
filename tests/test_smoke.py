@@ -234,9 +234,12 @@ def test_broadcast_preview_low_adherence(admin_login, db_conn, seed_patient):
 
 def test_broadcast_with_target_field(admin_login):
     """POST /line/broadcast รับ target field และคืน target ใน response"""
+    # ดึง CSRF token จาก session ที่ login ไว้แล้ว
+    session_id = admin_login.cookies.get("session_id")
+    csrf_token = app.SESSIONS.get(session_id, {}).get("csrf_token", "")
     r = admin_login.post(
         "/line/broadcast",
-        data={"message": "test", "target": "low_adherence"},
+        data={"message": "test", "target": "low_adherence", "csrf_token": csrf_token},
     )
     assert r.status_code == 200
     j = r.json()

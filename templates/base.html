@@ -3,88 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ระบบติดตามวาร์ฟาริน{% endblock %} | รพ.สุไหงปาดี</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>{% block title %}ระบบติดตามวาร์ฟาริน{% endblock %} | {{ hospital_name }}</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <script>
-    tailwind.config = {
-        theme: {
-            extend: {
-                fontFamily: { sans: ['Sarabun', 'system-ui', 'sans-serif'] },
-                colors: {
-                    brand: {
-                        50:'#EFF8FF', 100:'#DBEAFE', 500:'#0284C7', 600:'#0369A1', 700:'#075985',
-                        navy:'#0B1F36', navyLight:'#13294A',
-                    },
-                    surface: '#FFFFFF',
-                    bg: '#F0F4F8',
-                }
-            }
-        }
-    }
-    </script>
-
-    <style>
-        body { font-family: 'Sarabun', sans-serif; background: #F0F4F8; color: #0F1923; -webkit-font-smoothing: antialiased; }
-        [x-cloak] { display: none !important; }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        .nav-link { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; font-size:13px;
-                    color:#7E97AF; transition:all .13s; }
-        .nav-link:hover { background: rgba(255,255,255,.05); color:#CBD5E1; }
-        .nav-link.active { background: rgba(56,189,248,.12); color:#38BDF8; font-weight:600; }
-        .nav-link.active svg { stroke-width: 2; }
-        .stat-card { background:#fff; border:1px solid #E2E8F0; border-radius:12px; padding:18px 22px;
-                     box-shadow:0 1px 4px rgba(15,27,40,.06); }
-        .card { background:#fff; border:1px solid #E2E8F0; border-radius:12px;
-                box-shadow:0 1px 4px rgba(15,27,40,.06); }
-        .card-header { padding:16px 24px; border-bottom:1px solid #E2E8F0; display:flex; align-items:center; justify-content:space-between; }
-        .badge { display:inline-flex; align-items:center; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
-        .badge-success { background:#ECFDF5; color:#065F46; }
-        .badge-warning { background:#FFFBEB; color:#92400E; }
-        .badge-danger  { background:#FEF2F2; color:#991B1B; }
-        .badge-primary { background:#EFF8FF; color:#0369A1; }
-        .badge-purple  { background:#F5F3FF; color:#7C3AED; }
-        .badge-amber   { background:#FEF3C7; color:#78350F; }
-        .badge-default { background:#F1F5F9; color:#475569; }
-        .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 15px; font-size:13px; font-weight:600;
-               border-radius:8px; transition:background .15s; cursor:pointer; }
-        .btn-primary   { background:#0284C7; color:#fff; }
-        .btn-primary:hover { background:#0369A1; }
-        .btn-success   { background:#059669; color:#fff; }
-        .btn-success:hover { background:#065F46; }
-        .btn-danger    { background:#DC2626; color:#fff; }
-        .btn-danger:hover { background:#B91C1C; }
-        .btn-secondary { background:#fff; color:#0F1923; border:1px solid #E2E8F0; }
-        .btn-secondary:hover { background:#F0F4F8; }
-        .btn-ghost     { background:transparent; color:#4B5E6D; }
-        .btn-ghost:hover { background:#F0F4F8; }
-        .btn-sm { padding:5px 11px; font-size:12px; }
-        .input { width:100%; padding:9px 12px; border-radius:8px; border:1px solid #E2E8F0; font-size:13px; background:#fff; color:#0F1923; }
-        .input:focus { outline: 2px solid #0284C7; outline-offset:1px; border-color:#0284C7; }
-        .label { display:block; font-size:11px; font-weight:600; color:#4B5E6D; margin-bottom:4px; }
-        .data-table { width:100%; border-collapse:collapse; }
-        .data-table thead tr { background:#FAFBFC; border-bottom:1px solid #E2E8F0; }
-        .data-table th { padding:11px 18px; font-size:11px; font-weight:600; color:#8A9BAA; text-align:left;
-                         text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
-        .data-table tbody tr { border-bottom:1px solid #E2E8F0; transition:background .12s; }
-        .data-table tbody tr:hover { background:#F8FAFC; }
-        .data-table td { padding:14px 18px; font-size:13px; color:#0F1923; }
-    </style>
+    <link rel="stylesheet" href="/static/css/app.css">
+    <script defer src="/static/js/chart.min.js"></script>
+    {% block head_extra %}{% endblock %}
 </head>
 <body class="min-h-screen">
 
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
 
-    <!-- Sidebar -->
     <aside id="sidebar" class="fixed top-0 left-0 z-50 h-full w-60 transform -translate-x-full lg:translate-x-0 transition-transform duration-200 flex flex-col"
            style="background:#0B1F36;">
-        <!-- Header -->
         <div class="px-5 py-5" style="border-bottom:1px solid rgba(255,255,255,.06);">
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -93,13 +25,12 @@
                 </div>
                 <div>
                     <div class="text-sm font-bold text-sky-50">ระบบวาร์ฟาริน</div>
-                    <div class="text-[10px]" style="color:#7E97AF;">รพ.สุไหงปาดี</div>
+                    <div class="text-[10px]" style="color:#7E97AF;">{{ hospital_name }}</div>
                 </div>
             </div>
         </div>
 
-        <!-- Nav -->
-        <nav class="flex-1 p-2.5 overflow-y-auto space-y-1">
+        <nav class="flex-1 p-2.5 overflow-y-auto space-y-0.5">
             <a href="/dashboard" class="nav-link" data-path="/dashboard">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
                 แดชบอร์ด
@@ -108,46 +39,73 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 ผู้ป่วย
             </a>
-            <a href="/reports" class="nav-link" data-path="/reports">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                รายงาน
+            <a href="/appointments" class="nav-link" data-path="/appointments">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                นัดหมาย / INR
             </a>
             <a href="/symptoms" class="nav-link" data-path="/symptoms">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                อาการผู้ป่วย
+                <span class="flex-1">อาการผู้ป่วย</span>
+                {% if open_symptom_count %}<span class="badge badge-danger">{{ open_symptom_count }}</span>{% endif %}
+            </a>
+            <a href="/scan" class="nav-link" data-path="/scan">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                สแกน QR
+            </a>
+
+            <div class="nav-section">รายงาน</div>
+            <a href="/reports" class="nav-link" data-path="/reports">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                รายงานผลลัพธ์
             </a>
             <a href="/notifications" class="nav-link" data-path="/notifications">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                 การแจ้งเตือน
             </a>
+            <a href="/education" class="nav-link" data-path="/education">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                คู่มือผู้ป่วย
+            </a>
+
             {% if user and user.role == 'admin' %}
+            <div class="nav-section">ผู้ดูแลระบบ</div>
+            <a href="/staff" class="nav-link" data-path="/staff">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                บัญชีผู้ใช้
+            </a>
             <a href="/audit" class="nav-link" data-path="/audit">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Audit Log
+                บันทึกการใช้งาน
+            </a>
+            <a href="/system" class="nav-link" data-path="/system">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                สถานะระบบ
             </a>
             {% endif %}
         </nav>
 
-        <!-- User -->
         <div class="px-3 py-3" style="border-top:1px solid rgba(255,255,255,.06);">
-            <div class="flex items-center gap-2.5 px-2 py-1.5">
+            <a href="/account" class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/5">
                 <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                      style="background:rgba(56,189,248,.18); color:#38BDF8; font-weight:700; font-size:11px;">
-                    {{ (user.full_name or 'A')[:1] if user else 'A' }}
+                    {{ (user.full_name or user.username or 'A')[:1] if user else 'A' }}
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-xs font-semibold" style="color:#CBD5E1;">{{ user.full_name if user else 'Admin' }}</div>
-                    <a href="/logout" class="text-[10px]" style="color:#7E97AF;">ออกจากระบบ →</a>
+                    <div class="text-xs font-semibold truncate" style="color:#CBD5E1;">{{ user.full_name or user.username if user else '-' }}</div>
+                    <div class="text-[10px]" style="color:#7E97AF;">{{ roles.get(user.role, user.role) if user else '' }}</div>
                 </div>
-            </div>
+            </a>
+            <a href="/logout" class="nav-link mt-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                ออกจากระบบ
+            </a>
         </div>
     </aside>
 
-    <!-- Main -->
     <div class="lg:ml-60">
         <header class="sticky top-0 z-30 bg-white/85 backdrop-blur border-b lg:hidden" style="border-color:#E2E8F0;">
             <div class="flex items-center justify-between px-4 py-3">
-                <button onclick="toggleSidebar()" class="p-2 rounded-lg hover:bg-slate-100" style="color:#4B5E6D;">
+                <button onclick="toggleSidebar()" class="p-2 rounded-lg hover:bg-slate-100" style="color:#4B5E6D;" aria-label="เปิดเมนู">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
                 <span class="text-sm font-semibold" style="color:#0F1923;">ระบบวาร์ฟาริน</span>
@@ -156,6 +114,12 @@
         </header>
 
         <main class="p-5 sm:p-7 lg:p-8" style="max-width:1320px; margin:0 auto;">
+            {% if flash %}
+            <div class="flash flash-{{ flash_kind or 'success' }} mb-5 no-print" id="flashMessage">
+                <span>{{ flash }}</span>
+                <button onclick="document.getElementById('flashMessage').remove()" class="text-lg leading-none opacity-50 hover:opacity-100" aria-label="ปิด">&times;</button>
+            </div>
+            {% endif %}
             {% block content %}{% endblock %}
         </main>
     </div>
@@ -165,12 +129,16 @@
             document.getElementById('sidebar').classList.toggle('-translate-x-full');
             document.getElementById('sidebarOverlay').classList.toggle('hidden');
         }
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const path = window.location.pathname;
-            document.querySelectorAll('.nav-link').forEach(link => {
-                const p = link.dataset.path;
-                if (p && path.startsWith(p)) link.classList.add('active');
+            let best = null;
+            document.querySelectorAll('.nav-link[data-path]').forEach(link => {
+                const target = link.dataset.path;
+                if (path === target || path.startsWith(target + '/')) {
+                    if (!best || target.length > best.dataset.path.length) best = link;
+                }
             });
+            if (best) best.classList.add('active');
         });
     </script>
     {% block extra_js %}{% endblock %}

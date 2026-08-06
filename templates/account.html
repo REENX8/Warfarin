@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}บัญชีของฉัน{% endblock %}
+{% block content %}
+<div class="space-y-5" style="max-width:560px;">
+    <h1 class="text-[22px] font-bold tracking-tight">บัญชีของฉัน</h1>
+
+    <div class="card p-6 space-y-3 text-[13px]">
+        <div class="flex justify-between"><span style="color:#8A9BAA;">ชื่อผู้ใช้</span><strong>{{ user.username }}</strong></div>
+        <div class="flex justify-between"><span style="color:#8A9BAA;">ชื่อ-สกุล</span><strong>{{ user.full_name or '-' }}</strong></div>
+        <div class="flex justify-between"><span style="color:#8A9BAA;">บทบาท</span><strong>{{ roles.get(user.role, user.role) }}</strong></div>
+        <div class="flex justify-between"><span style="color:#8A9BAA;">เข้าสู่ระบบเมื่อ</span><strong>{{ user.created_at | datetime_str }}</strong></div>
+        <div class="flex justify-between"><span style="color:#8A9BAA;">เซสชันหมดอายุ</span><strong>{{ user.expires_at | datetime_str }}</strong></div>
+    </div>
+
+    <div class="flex gap-2">
+        <a href="/account/password" class="btn btn-primary">เปลี่ยนรหัสผ่าน</a>
+        <a href="/logout" class="btn btn-secondary">ออกจากระบบ</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,50 +1,50 @@
 {% extends "base.html" %}
-{% block title %}Audit Log{% endblock %}
+{% block title %}บันทึกการใช้งาน{% endblock %}
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-5">
     <div>
-        <h1 class="text-[22px] font-bold tracking-tight" style="color:#0F1923;">Audit Log</h1>
-        <p class="text-[13px] mt-1" style="color:#8A9BAA;">บันทึกการกระทำในระบบ (Admin only)</p>
+        <h1 class="text-[22px] font-bold tracking-tight">บันทึกการใช้งานระบบ</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">{{ total }} รายการ</p>
     </div>
 
-    <div class="card" style="padding:0;">
-        <div class="card-header">
-            <div>
-                <div class="text-sm font-semibold" style="color:#0F1923;">ประวัติการกระทำ</div>
-                <div class="text-xs mt-0.5" style="color:#8A9BAA;">{{ logs|length }} รายการล่าสุด</div>
-            </div>
+    <form method="GET" action="/audit" class="flex gap-2 items-end flex-wrap no-print">
+        <div style="width:240px;">
+            <label class="label" for="action">ประเภทการกระทำ</label>
+            <select class="input" id="action" name="action" onchange="this.form.submit()">
+                <option value="">ทั้งหมด</option>
+                {% for name in actions %}
+                <option value="{{ name }}" {% if action == name %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
         </div>
+    </form>
+
+    <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>เวลา</th>
-                        <th>ผู้ใช้</th>
-                        <th>การกระทำ</th>
-                        <th class="hidden md:table-cell">IP</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>เวลา</th><th>การกระทำ</th><th>เป้าหมาย</th><th>ผู้ทำ</th><th>รายละเอียด</th></tr></thead>
                 <tbody>
                     {% for log in logs %}
                     <tr>
-                        <td style="color:#8A9BAA; white-space:nowrap; font-size:12px;">
-                            {{ log.created_at[:16] if log.created_at else '-' }}
-                        </td>
-                        <td>
-                            <span class="badge badge-primary">{{ log.username or 'system' }}</span>
-                        </td>
-                        <td style="font-size:13px; color:#0F1923;">{{ log.action }}</td>
-                        <td class="hidden md:table-cell" style="font-size:12px; color:#8A9BAA;">
-                            {{ log.ip_address or '-' }}
-                        </td>
+                        <td class="text-[12px]" style="color:#8A9BAA; white-space:nowrap;">{{ log.created_at | datetime_str }}</td>
+                        <td><span class="badge badge-primary">{{ log.action }}</span></td>
+                        <td class="text-[12px]" style="color:#4B5E6D;">{{ log.entity_type }} #{{ log.entity_id }}</td>
+                        <td class="text-[12px] font-semibold">{{ log.performed_by }}</td>
+                        <td class="text-[12px]" style="color:#4B5E6D; max-width:420px;">{{ log.details or '-' }}</td>
                     </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center py-16" style="color:#8A9BAA;">ยังไม่มีบันทึกการใช้งาน</td></tr>
                     {% endfor %}
-                    {% if not logs %}
-                    <tr><td colspan="4" class="text-center py-14" style="color:#8A9BAA;">ยังไม่มี Audit Log</td></tr>
-                    {% endif %}
                 </tbody>
             </table>
         </div>
+        {% if total_pages > 1 %}
+        <div class="pager">
+            {% if page > 1 %}<a href="?action={{ action }}&page={{ page - 1 }}">← ก่อนหน้า</a>{% endif %}
+            <span class="current">{{ page }} / {{ total_pages }}</span>
+            {% if page < total_pages %}<a href="?action={{ action }}&page={{ page + 1 }}">ถัดไป →</a>{% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

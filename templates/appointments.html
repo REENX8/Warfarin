@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}นัดหมาย{% endblock %}
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+            <h1 class="text-[22px] font-bold tracking-tight">ตารางนัดหมาย / ตรวจ INR</h1>
+            <p class="text-[13px] mt-1" style="color:#8A9BAA;">แสดงนัดหมาย {{ days }} วันข้างหน้า</p>
+        </div>
+        <div class="flex gap-2 no-print">
+            {% for option in [7, 14, 30, 60] %}
+            <a href="/appointments?days={{ option }}" class="btn btn-sm {{ 'btn-primary' if days == option else 'btn-secondary' }}">{{ option }} วัน</a>
+            {% endfor %}
+            <button onclick="window.print()" class="btn btn-secondary btn-sm">🖨️</button>
+        </div>
+    </div>
+
+    {% if overdue %}
+    <div class="card">
+        <div class="card-header"><div class="text-sm font-semibold" style="color:#B91C1C;">เลยกำหนดตรวจ INR ({{ overdue|length }} ราย)</div></div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead><tr><th>ผู้ป่วย</th><th>กำหนดเดิม</th><th class="text-center">โทรศัพท์</th></tr></thead>
+                <tbody>
+                    {% for patient in overdue %}
+                    <tr>
+                        <td><a href="/patients/{{ patient.patient_id }}" class="font-semibold hover:underline" style="color:#0284C7;">{{ patient.full_name }}</a>
+                            <div class="text-[11px]" style="color:#8A9BAA;">HN {{ patient.hn or '-' }}</div></td>
+                        <td><span class="badge badge-danger">{{ patient.next_inr_date | thai_date }}</span></td>
+                        <td class="text-center text-[12px]">{% if patient.phone %}<a href="tel:{{ patient.phone }}" style="color:#0284C7;">{{ patient.phone }}</a>{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% for date, items in grouped %}
+    <div class="card">
+        <div class="card-header">
+            <div class="text-sm font-semibold">{{ date | thai_date(false) }}</div>
+            <span class="badge badge-primary">{{ items|length }} นัด</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead><tr><th>เวลา</th><th>ผู้ป่วย</th><th>ประเภท</th><th class="hidden sm:table-cell">สถานที่</th><th class="text-center">โทรศัพท์</th></tr></thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.appointment_time or '-' }}</td>
+                        <td><a href="/patients/{{ item.patient_id }}" class="font-semibold hover:underline" style="color:#0284C7;">{{ item.full_name }}</a>
+                            <div class="text-[11px]" style="color:#8A9BAA;">HN {{ item.hn or '-' }}</div></td>
+                        <td><span class="badge badge-default">{{ appointment_types.get(item.appointment_type, '-') }}</span></td>
+                        <td class="hidden sm:table-cell text-[12px]" style="color:#4B5E6D;">{{ item.location or '-' }}</td>
+                        <td class="text-center text-[12px]">{% if item.phone %}<a href="tel:{{ item.phone }}" style="color:#0284C7;">{{ item.phone }}</a>{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card text-center py-16" style="color:#8A9BAA;">ไม่มีนัดหมายในช่วงเวลานี้</div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,116 +1,152 @@
 {% extends "base.html" %}
 {% block title %}รายงาน{% endblock %}
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-5">
+
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-            <h1 class="text-[22px] font-bold tracking-tight" style="color:#0F1923;">รายงาน</h1>
-            <p class="text-[13px] mt-1" style="color:#8A9BAA;">สรุปข้อมูลผู้ป่วยคลินิกวาร์ฟาริน</p>
+            <h1 class="text-[22px] font-bold tracking-tight">รายงานผลลัพธ์</h1>
+            <p class="text-[13px] mt-1" style="color:#8A9BAA;">ตัวชี้วัดหลัก: ความสม่ำเสมอในการกินยา และ Time in Therapeutic Range</p>
         </div>
-        <a href="/reports/export" class="btn btn-secondary btn-sm">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Export CSV
-        </a>
-    </div>
-
-    <!-- Summary stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="stat-card">
-            <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:#8A9BAA;">Adherence เฉลี่ย 30 วัน</div>
-            <div class="text-[30px] font-extrabold" style="color:#D97706;">{{ avg_adherence_30 }}%</div>
-            <div class="text-xs mt-1" style="color:#8A9BAA;">ผู้ป่วย active {{ active_count }} ราย</div>
-        </div>
-        <div class="stat-card">
-            <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:#8A9BAA;">TTR เฉลี่ย (Rosendaal)</div>
-            <div class="text-[30px] font-extrabold" style="color:#0284C7;">{{ avg_ttr }}%</div>
-            <div class="text-xs mt-1" style="color:#8A9BAA;">เป้าหมาย ≥ 65%</div>
-        </div>
-        <div class="stat-card">
-            <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:#8A9BAA;">ผู้ป่วยเชื่อม LINE</div>
-            <div class="text-[30px] font-extrabold" style="color:#059669;">{{ line_linked }} / {{ active_count }}</div>
-            <div class="text-xs mt-1" style="color:#8A9BAA;">{{ ((line_linked / active_count * 100) | round(0) | int) if active_count else 0 }}% ของผู้ป่วย active</div>
+        <div class="flex gap-2 no-print">
+            <a href="/reports/export.csv" class="btn btn-secondary">⬇️ CSV</a>
+            <a href="/reports/export.xlsx" class="btn btn-secondary">⬇️ Excel</a>
+            <button onclick="window.print()" class="btn btn-secondary">🖨️ พิมพ์</button>
         </div>
     </div>
 
-    <!-- Survey summary (if any) -->
-    {% if survey_summary %}
-    <div class="card" style="padding:18px 22px;">
-        <div class="text-sm font-semibold mb-3" style="color:#0F1923;">สรุปแบบสอบถามความพึงพอใจ ({{ survey_summary.count }} ราย)</div>
-        <div class="grid grid-cols-3 gap-4">
-            {% for label, val in [('การใช้งาน', survey_summary.ease_avg), ('LINE OA', survey_summary.line_avg), ('การเตือน', survey_summary.reminder_avg)] %}
-            <div class="text-center">
-                <div class="text-[11px] mb-1" style="color:#8A9BAA;">{{ label }}</div>
-                <div class="text-2xl font-bold" style="color:{% if val >= 4 %}#059669{% elif val >= 3 %}#D97706{% else %}#DC2626{% endif %};">{{ '%.1f'|format(val) }}</div>
-                <div class="text-[10px]" style="color:#8A9BAA;">/ 5.0</div>
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">ผู้ป่วยที่ติดตาม</div>
+            <div class="text-[26px] font-extrabold" style="color:#0284C7;">{{ summary.patients }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">สม่ำเสมอเฉลี่ย 30 วัน</div>
+            <div class="text-[26px] font-extrabold {{ summary.avg_adherence_30d | percent_class }}">{{ summary.avg_adherence_30d }}%</div>
+        </div>
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">TTR เฉลี่ย</div>
+            <div class="text-[26px] font-extrabold {% if summary.avg_ttr and summary.avg_ttr >= 65 %}text-emerald-600{% elif summary.avg_ttr %}text-amber-600{% else %}text-slate-400{% endif %}">
+                {% if summary.avg_ttr is not none %}{{ summary.avg_ttr }}%{% else %}—{% endif %}
             </div>
-            {% endfor %}
+        </div>
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">INR ล่าสุดในเป้าหมาย</div>
+            <div class="text-[26px] font-extrabold" style="color:#059669;">
+                {% if summary.inr_in_range_pct is not none %}{{ summary.inr_in_range_pct }}%{% else %}—{% endif %}
+            </div>
+            <div class="text-[11px] mt-1" style="color:#8A9BAA;">จาก {{ summary.patients_with_inr }} รายที่มีผล</div>
+        </div>
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">สม่ำเสมอ ≥ 80%</div>
+            <div class="text-[26px] font-extrabold" style="color:#7C3AED;">{{ summary.adherence_above_80 }}</div>
+            <div class="text-[11px] mt-1" style="color:#8A9BAA;">ราย</div>
         </div>
     </div>
-    {% endif %}
 
-    <!-- Per-patient table -->
-    <div class="card" style="padding:0;">
-        <div class="card-header">
-            <div class="text-sm font-semibold" style="color:#0F1923;">สรุปรายบุคคล</div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="card lg:col-span-2">
+            <div class="card-header"><div class="text-sm font-semibold">แนวโน้มความสม่ำเสมอรายเดือน (ทั้งคลินิก)</div></div>
+            <div class="p-5"><div style="height:220px;"><canvas id="trendChart"></canvas></div></div>
         </div>
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">ความพึงพอใจและความรู้</div></div>
+            <div class="p-5 space-y-2 text-[13px]">
+                {% if survey_summary and survey_summary.total %}
+                <div class="flex justify-between"><span style="color:#8A9BAA;">ใช้งานง่าย</span><strong>{{ '%.1f'|format(survey_summary.ease or 0) }}/5</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">ความพึงพอใจ LINE</span><strong>{{ '%.1f'|format(survey_summary.line_sat or 0) }}/5</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">การเตือนมีประโยชน์</span><strong>{{ '%.1f'|format(survey_summary.remind or 0) }}/5</strong></div>
+                <div class="flex justify-between pt-2" style="border-top:1px solid #F1F5F9;"><span style="color:#8A9BAA;">จำนวนผู้ตอบ</span><strong>{{ survey_summary.total }}</strong></div>
+                {% else %}
+                <p style="color:#8A9BAA;">ยังไม่มีผลแบบสอบถาม</p>
+                {% endif %}
+
+                {% if test_scores %}
+                <div class="pt-3 mt-2" style="border-top:1px solid #F1F5F9;">
+                    {% for row in test_scores %}
+                    <div class="flex justify-between">
+                        <span style="color:#8A9BAA;">คะแนน{{ 'ก่อน' if row.test_type == 'pre' else 'หลัง' }}อบรม (n={{ row.n }})</span>
+                        <strong>{{ '%.1f'|format(row.avg_pct or 0) }}%</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card overflow-hidden">
+        <div class="card-header"><div class="text-sm font-semibold">รายละเอียดรายบุคคล</div></div>
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>ชื่อ-สกุล</th>
                         <th>HN</th>
-                        <th class="text-center">Adh 7 วัน</th>
-                        <th class="text-center">Adh 30 วัน</th>
+                        <th>ชื่อ-สกุล</th>
+                        <th class="text-center">mg/สัปดาห์</th>
+                        <th class="text-center">สม่ำเสมอ 7 วัน</th>
+                        <th class="text-center">สม่ำเสมอ 30 วัน</th>
+                        <th class="text-center">ต่อเนื่อง</th>
                         <th class="text-center">INR ล่าสุด</th>
                         <th class="text-center">TTR</th>
-                        <th class="text-center">Streak</th>
-                        <th class="text-center">ความเสี่ยง</th>
+                        <th class="text-center hidden lg:table-cell">นัดตรวจถัดไป</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for row in report_rows %}
-                    <tr onclick="window.location='/patients/{{ row.patient_id }}'" class="cursor-pointer">
-                        <td>
-                            <div class="flex items-center gap-2.5">
-                                <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style="background:#0284C7;">
-                                    {{ row.full_name[3:5] if row.full_name|length > 3 else row.full_name[:2] }}
-                                </div>
-                                <span class="font-semibold" style="color:#0F1923;">{{ row.full_name }}</span>
-                            </div>
-                        </td>
-                        <td style="color:#8A9BAA; font-size:12px;">{{ row.hn or '-' }}</td>
+                    {% for row in report_data %}
+                    <tr>
+                        <td style="color:#8A9BAA;">{{ row.patient.hn or '-' }}</td>
+                        <td><a href="/patients/{{ row.patient.patient_id }}" class="font-semibold hover:underline" style="color:#0284C7;">{{ row.patient.full_name }}</a></td>
+                        <td class="text-center">{{ row.weekly_mg or '-' }}</td>
+                        <td class="text-center"><span class="font-bold {{ row.adh7.percent | percent_class }}">{{ row.adh7.percent }}%</span></td>
+                        <td class="text-center"><span class="font-bold {{ row.adh30.percent | percent_class }}">{{ row.adh30.percent }}%</span></td>
+                        <td class="text-center">{{ row.streak }}</td>
                         <td class="text-center">
-                            <span class="font-bold {% if row.adh7 >= 80 %}text-emerald-600{% elif row.adh7 >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">
-                                {{ row.adh7 }}%
-                            </span>
+                            {% if row.last_inr %}
+                            <span class="badge {{ 'badge-success' if row.last_inr.in_range else 'badge-danger' }}">{{ row.last_inr.value }}</span>
+                            <div class="text-[10px] mt-0.5" style="color:#8A9BAA;">{{ row.last_inr.test_date | thai_date }}</div>
+                            {% else %}—{% endif %}
                         </td>
-                        <td class="text-center">
-                            <span class="font-bold {% if row.adh30 >= 80 %}text-emerald-600{% elif row.adh30 >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">
-                                {{ row.adh30 }}%
-                            </span>
-                        </td>
-                        <td class="text-center font-bold {% if row.inr_in_range %}text-emerald-600{% elif row.last_inr %}text-rose-600{% else %}text-slate-400{% endif %}">
-                            {{ row.last_inr or '—' }}
-                        </td>
-                        <td class="text-center">
-                            <span class="font-bold {% if row.ttr and row.ttr >= 65 %}text-emerald-600{% elif row.ttr %}text-amber-600{% else %}text-slate-400{% endif %}">
-                                {{ row.ttr ~ '%' if row.ttr else '—' }}
-                            </span>
-                        </td>
-                        <td class="text-center" style="color:#4B5E6D;">🔥 {{ row.streak }} วัน</td>
-                        <td class="text-center">
-                            {% if row.risk == 'high' %}<span class="badge badge-danger">เสี่ยงสูง</span>
-                            {% elif row.risk == 'medium' %}<span class="badge badge-warning">เฝ้าระวัง</span>
-                            {% else %}<span class="badge badge-success">ปกติ</span>{% endif %}
-                        </td>
+                        <td class="text-center">{% if row.ttr is not none %}{{ row.ttr }}%{% else %}—{% endif %}</td>
+                        <td class="text-center hidden lg:table-cell" style="color:#4B5E6D;">{{ row.patient.next_inr_date | thai_date or '-' }}</td>
                     </tr>
+                    {% else %}
+                    <tr><td colspan="9" class="text-center py-16" style="color:#8A9BAA;">ยังไม่มีผู้ป่วยในระบบ</td></tr>
                     {% endfor %}
-                    {% if not report_rows %}
-                    <tr><td colspan="8" class="text-center py-14" style="color:#8A9BAA;">ไม่มีข้อมูล</td></tr>
-                    {% endif %}
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const trend = {{ trend | tojson }};
+const canvas = document.getElementById('trendChart');
+if (canvas && trend.length) {
+    new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: trend.map(t => t.label),
+            datasets: [{
+                label: '% ความสม่ำเสมอ',
+                data: trend.map(t => t.percent),
+                backgroundColor: trend.map(t => (t.percent ?? 0) >= 80 ? '#059669' : ((t.percent ?? 0) >= 60 ? '#F59E0B' : '#DC2626')),
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { family: 'Sarabun', size: 11 }, color: '#8A9BAA' } },
+                y: { min: 0, max: 100, grid: { color: 'rgba(0,0,0,.04)' },
+                     ticks: { font: { family: 'Sarabun', size: 11 }, color: '#8A9BAA', callback: v => v + '%' } }
+            }
+        }
+    });
+}
+</script>
 {% endblock %}

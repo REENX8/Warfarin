@@ -1,17 +1,40 @@
-.venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Environment
 .env
-medtrack.db
-medtrack_backup.db
+.env.local
+
+# Database (never commit patient data)
+*.db
 *.db-journal
 *.db-wal
 *.db-shm
+medtrack.db
+medtrack_backup.db
+
+# Test / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Legacy scratch files
 app_old.py
 adee.py
 kk.py
-dose_qr.png
 qrm.py
+dose_qr.png
 chapter1_text.txt
 chapter3_text.txt
 New Text Document.txt

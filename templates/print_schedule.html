@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}ตารางกินยา — {{ patient.full_name }}{% endblock %}
+{% block content %}
+<div class="space-y-5">
+    <div class="flex justify-between items-start gap-3 no-print">
+        <a href="/patients/{{ patient.patient_id }}" class="text-[13px] font-medium" style="color:#0284C7;">← กลับข้อมูลผู้ป่วย</a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">🖨️ พิมพ์</button>
+    </div>
+
+    <div class="card p-7">
+        <div class="text-center mb-5" style="border-bottom:2px solid #0B1F36; padding-bottom:14px;">
+            <div class="text-[18px] font-bold">ตารางการกินยาวาร์ฟาริน</div>
+            <div class="text-[13px] mt-1" style="color:#4B5E6D;">{{ hospital_name }}{% if hospital_phone %} · โทร {{ hospital_phone }}{% endif %}</div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[13px] mb-5">
+            <div><div class="text-[11px]" style="color:#8A9BAA;">ชื่อ-สกุล</div><div class="font-bold">{{ patient.full_name }}</div></div>
+            <div><div class="text-[11px]" style="color:#8A9BAA;">HN</div><div class="font-bold">{{ patient.hn or '-' }}</div></div>
+            <div><div class="text-[11px]" style="color:#8A9BAA;">INR เป้าหมาย</div><div class="font-bold">{{ patient.target_inr_min }}–{{ patient.target_inr_max }}</div></div>
+            <div><div class="text-[11px]" style="color:#8A9BAA;">ขนาดยาต่อสัปดาห์</div><div class="font-bold">{{ weekly_mg or '-' }} mg</div></div>
+        </div>
+
+        {% if appointments %}
+        <div class="mb-5 p-3 rounded-lg text-[13px]" style="background:#EFF8FF; border:1px solid #BAE6FD;">
+            <strong>นัดครั้งถัดไป:</strong>
+            {% for appointment in appointments %}
+            {{ appointment.appointment_date | thai_date(false) }}{% if appointment.appointment_time %} เวลา {{ appointment.appointment_time }} น.{% endif %}
+            ({{ appointment_types.get(appointment.appointment_type, '-') }}){% if not loop.last %} · {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <table class="data-table" style="border:1px solid #E2E8F0;">
+            <thead>
+                <tr><th>วันที่</th><th>เวลา</th><th>ขนาดยา</th><th>ลักษณะเม็ดยา</th><th style="width:90px;">กินแล้ว ✓</th></tr>
+            </thead>
+            <tbody>
+                {% for dose in doses %}
+                <tr>
+                    <td>{{ dose.scheduled_date | thai_date(false) }}</td>
+                    <td>{{ dose.scheduled_time }} น.</td>
+                    <td class="font-bold">{{ dose.warfarin_mg }} mg</td>
+                    <td style="color:#4B5E6D;">{{ dose.pill_description or 'ยาวาร์ฟาริน' }}</td>
+                    <td style="border-left:1px solid #E2E8F0;">&nbsp;</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center py-10" style="color:#8A9BAA;">ยังไม่มีแผนการกินยาในช่วงนี้</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="mt-5 p-4 rounded-lg text-[12px]" style="background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; line-height:1.8;">
+            <strong>ข้อควรปฏิบัติ</strong><br>
+            • กินยาเวลาเดิมทุกวัน ห้ามหยุดยาหรือปรับขนาดยาเอง<br>
+            • ลืมกินยา: นึกได้ภายใน 12 ชั่วโมงให้กินทันที เกิน 12 ชั่วโมงให้ข้ามมื้อนั้น ห้ามกินซ้อน<br>
+            • กินผักใบเขียวได้ แต่ให้ปริมาณสม่ำเสมอ งดแอลกอฮอล์<br>
+            • แจ้งทุกครั้งว่ากินวาร์ฟารินอยู่ เมื่อพบแพทย์ ทันตแพทย์ หรือซื้อยาเอง<br>
+            • หากเลือดออกไม่หยุด อาเจียนเป็นเลือด อุจจาระสีดำ หรือปวดศีรษะรุนแรง ให้มาโรงพยาบาลทันที
+        </div>
+    </div>
+</div>
+{% endblock %}

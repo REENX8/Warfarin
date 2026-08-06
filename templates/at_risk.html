@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}ผู้ป่วยที่ต้องติดตาม{% endblock %}
+{% block content %}
+<div class="space-y-5">
+    <div>
+        <h1 class="text-[22px] font-bold tracking-tight">ผู้ป่วยที่ต้องติดตามเป็นพิเศษ</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">
+            เกณฑ์: กินยาสม่ำเสมอต่ำกว่า 70% ใน 7 วัน · ขาดยา 3 มื้อขึ้นไป · ขาดยาติดต่อกัน 2 วัน · หรือ INR ล่าสุดนอกเป้าหมาย
+        </p>
+    </div>
+
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ผู้ป่วย</th>
+                        <th class="text-center">สม่ำเสมอ 7 วัน</th>
+                        <th class="text-center">สม่ำเสมอ 30 วัน</th>
+                        <th class="text-center">ขาดติดต่อกัน</th>
+                        <th class="text-center">INR ล่าสุด</th>
+                        <th>เหตุผล</th>
+                        <th class="text-center">ติดต่อ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in at_risk %}
+                    <tr>
+                        <td>
+                            <a href="/patients/{{ item.patient.patient_id }}" class="font-semibold hover:underline" style="color:#0284C7;">{{ item.patient.full_name }}</a>
+                            <div class="text-[11px]" style="color:#8A9BAA;">HN {{ item.patient.hn or '-' }}</div>
+                        </td>
+                        <td class="text-center"><span class="font-bold {{ item.adherence.percent | percent_class }}">{{ item.adherence.percent }}%</span></td>
+                        <td class="text-center"><span class="font-bold {{ item.adherence30.percent | percent_class }}">{{ item.adherence30.percent }}%</span></td>
+                        <td class="text-center">
+                            {% if item.consecutive_missed %}<span class="badge badge-danger">{{ item.consecutive_missed }} วัน</span>{% else %}—{% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.last_inr %}
+                            <span class="badge {{ 'badge-success' if item.last_inr.in_range else 'badge-danger' }}">{{ item.last_inr.value }}</span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-[12px]" style="color:#4B5E6D;">{{ item.reasons | join(' · ') }}</td>
+                        <td class="text-center text-[12px]">
+                            {% if item.patient.phone %}<a href="tel:{{ item.patient.phone }}" style="color:#0284C7;">{{ item.patient.phone }}</a>{% else %}—{% endif %}
+                            {% if item.patient.line_user_id %}<div class="badge badge-primary mt-1">LINE</div>{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center py-16" style="color:#8A9BAA;">ไม่มีผู้ป่วยที่ต้องติดตามเป็นพิเศษ 🎉</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

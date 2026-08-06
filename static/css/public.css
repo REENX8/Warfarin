@@ -1,0 +1,88 @@
+/* Patient-facing pages (dose confirmation, portal, symptom form).
+ * Mobile-first: these are opened from a LINE message on a phone. */
+
+body {
+    padding: 20px 14px 44px;
+}
+.shell { width: 100%; max-width: 440px; margin: 0 auto; }
+
+.brand { text-align: center; margin-bottom: 18px; }
+.brand-row { display: inline-flex; align-items: center; gap: 10px; }
+.brand-icon {
+    width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+    background: linear-gradient(135deg, #0369A1, #0891B2);
+    display: flex; align-items: center; justify-content: center;
+}
+.brand h1 { font-size: 15px; font-weight: 700; }
+.brand p { font-size: 11px; color: #8A9BAA; }
+
+.shell .card {
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(15,27,40,.07);
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+.card-pad { padding: 20px; }
+.section-title {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: #8A9BAA; margin-bottom: 10px;
+}
+
+.row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px;
+}
+.row:last-child { border-bottom: 0; }
+.row .k { color: #64748B; }
+.row .v { font-weight: 600; text-align: right; }
+
+/* Full-width tap targets — these pages are used one-handed on a phone. */
+.shell .btn {
+    display: block; width: 100%; padding: 14px; border-radius: 12px;
+    font-size: 15px; font-weight: 700; text-align: center;
+}
+.shell .btn-primary {
+    background: linear-gradient(135deg, #059669, #10B981); color: #fff;
+    box-shadow: 0 6px 20px rgba(5,150,105,.28);
+}
+.shell .btn-primary:hover { background: linear-gradient(135deg, #047857, #059669); }
+.shell .btn-dark { background: #0B1F36; color: #fff; }
+.shell .btn-ghost {
+    background: #fff; border: 1px solid #E2E8F0; color: #4B5E6D;
+    font-size: 13px; font-weight: 600; padding: 12px;
+}
+
+.notice { border-radius: 12px; padding: 14px 16px; font-size: 13px; line-height: 1.6; }
+.notice-danger  { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
+.notice-warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+.notice-success { background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; }
+.notice-info    { background: #EFF8FF; border: 1px solid #BAE6FD; color: #075985; }
+.notice ul { margin-left: 18px; }
+
+.pill {
+    display: inline-flex; align-items: center; padding: 3px 10px;
+    border-radius: 20px; font-size: 11px; font-weight: 700;
+}
+.pill-success { background: #ECFDF5; color: #065F46; }
+.pill-warning { background: #FFFBEB; color: #92400E; }
+.pill-danger  { background: #FEF2F2; color: #991B1B; }
+.pill-default { background: #F1F5F9; color: #475569; }
+
+.foot {
+    text-align: center; font-size: 11px; color: #94A3B8;
+    margin-top: 20px; line-height: 1.7;
+}
+
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.field input, .field textarea, .field select {
+    width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid #CBD5E1;
+    font-family: inherit; font-size: 14px; background: #fff; color: #0F1923;
+}
+.field input:focus, .field textarea:focus, .field select:focus {
+    outline: 2px solid #0284C7; outline-offset: 1px;
+}
+.field textarea { resize: vertical; }
+
+/* Severity picker on the symptom form. */
+.sev-input:checked + .sev-box { background: #E11D48; border-color: #E11D48; color: #fff; }

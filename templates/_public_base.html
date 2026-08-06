@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{% block title %}ระบบวาร์ฟาริน{% endblock %} | {{ hospital_name }}</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+    <link rel="stylesheet" href="/static/css/public.css">
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+<div class="shell">
+    <div class="brand">
+        <div class="brand-row">
+            <div class="brand-icon">
+                <svg width="17" height="17" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <div style="text-align:left;">
+                <h1>ระบบติดตามยาวาร์ฟาริน</h1>
+                <p>{{ hospital_name }}</p>
+            </div>
+        </div>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <p class="foot">
+        ระบบติดตามการกินยาวาร์ฟาริน · {{ hospital_name }}
+        {% if hospital_phone %}<br>โทร {{ hospital_phone }}{% endif %}
+    </p>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

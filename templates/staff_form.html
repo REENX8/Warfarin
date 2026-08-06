@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ 'แก้ไขบัญชี' if account else 'เพิ่มบัญชี' }}{% endblock %}
+{% block content %}
+<div class="space-y-5" style="max-width:560px;">
+    <a href="/staff" class="text-[13px] font-medium" style="color:#0284C7;">← กลับรายการบัญชี</a>
+    <h1 class="text-[22px] font-bold tracking-tight">{{ 'แก้ไขบัญชี ' ~ account.username if account else 'เพิ่มบัญชีผู้ใช้' }}</h1>
+
+    {% if error %}
+    <div class="flash flash-danger"><div>{{ error }}</div></div>
+    {% endif %}
+
+    <form method="POST" action="{{ '/staff/' ~ account.staff_id ~ '/edit' if account else '/staff/new' }}" class="card p-6 space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        {% if not account %}
+        <div>
+            <label class="label" for="username">ชื่อผู้ใช้ <span style="color:#DC2626;">*</span></label>
+            <input class="input" id="username" name="username" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._\-]+" value="{{ (form or {}).get('username', '') }}">
+            <div class="text-[11px] mt-1" style="color:#8A9BAA;">3–40 ตัวอักษร ใช้ได้เฉพาะ a-z 0-9 . _ -</div>
+        </div>
+        <div>
+            <label class="label" for="password">รหัสผ่าน <span style="color:#DC2626;">*</span></label>
+            <input class="input" id="password" name="password" type="password" required minlength="8" autocomplete="new-password">
+            <div class="text-[11px] mt-1" style="color:#8A9BAA;">อย่างน้อย 8 ตัวอักษร ไม่ใช่ตัวเลขล้วน</div>
+        </div>
+        {% endif %}
+
+        <div>
+            <label class="label" for="full_name">ชื่อ-นามสกุล</label>
+            <input class="input" id="full_name" name="full_name" maxlength="120" value="{{ account.full_name if account else (form or {}).get('full_name', '') }}">
+        </div>
+
+        <div>
+            <label class="label" for="role">บทบาท</label>
+            <select class="input" id="role" name="role">
+                {% for key, label in staff_roles.items() %}
+                <option value="{{ key }}" {% if account and account.role == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <div class="text-[11px] mt-1" style="color:#8A9BAA;">
+                ผู้ดูแลระบบ = จัดการบัญชีและดูบันทึกการใช้งาน · เภสัชกร/พยาบาล = แก้ไขข้อมูลผู้ป่วยและตอบอาการ · เจ้าหน้าที่ = ดูอย่างเดียว
+            </div>
+        </div>
+
+        {% if account %}
+        <label class="flex items-center gap-2 text-[13px]">
+            <input type="checkbox" name="is_active" {% if account.is_active %}checked{% endif %}> เปิดใช้งานบัญชีนี้
+        </label>
+        {% else %}
+        <label class="flex items-center gap-2 text-[13px]">
+            <input type="checkbox" name="must_change_password" checked> ให้ผู้ใช้ตั้งรหัสผ่านใหม่เมื่อเข้าระบบครั้งแรก
+        </label>
+        {% endif %}
+
+        <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary">บันทึก</button>
+            <a href="/staff" class="btn btn-secondary">ยกเลิก</a>
+        </div>
+    </form>
+
+    {% if account %}
+    <form method="POST" action="/staff/{{ account.staff_id }}/reset-password" class="card p-6 space-y-3"
+          onsubmit="return confirm('รีเซ็ตรหัสผ่านของ {{ account.username }}? เซสชันทั้งหมดของผู้ใช้นี้จะถูกยกเลิก');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="text-sm font-semibold">รีเซ็ตรหัสผ่าน</div>
+        <p class="text-[12px]" style="color:#8A9BAA;">ผู้ใช้จะต้องตั้งรหัสผ่านใหม่ด้วยตัวเองเมื่อเข้าสู่ระบบครั้งถัดไป</p>
+        <div>
+            <label class="label" for="new_password">รหัสผ่านชั่วคราว</label>
+            <input class="input" id="new_password" name="password" type="password" required minlength="8" autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-danger">รีเซ็ตรหัสผ่าน</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

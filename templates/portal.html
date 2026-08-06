@@ -1,0 +1,112 @@
+{% extends "_public_base.html" %}
+{% block title %}ข้อมูลสุขภาพของฉัน{% endblock %}
+{% block content %}
+
+<div class="card card-pad">
+    <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:46px; height:46px; border-radius:50%; background:#DBEAFE; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">👤</div>
+        <div>
+            <div style="font-size:16px; font-weight:700;">{{ patient.full_name }}</div>
+            <div style="font-size:12px; color:#8A9BAA;">HN {{ patient.hn or '-' }} · เป้าหมาย INR {{ patient.target_inr_min }}–{{ patient.target_inr_max }}</div>
+        </div>
+    </div>
+</div>
+
+{% if today_dose %}
+<div class="card card-pad">
+    <div class="section-title">ยาของวันนี้</div>
+    <div class="row"><span class="k">ขนาดยา</span><span class="v">{{ today_dose.warfarin_mg }} mg</span></div>
+    <div class="row"><span class="k">เวลา</span><span class="v">{{ today_dose.scheduled_time }} น.</span></div>
+    <div class="row">
+        <span class="k">สถานะ</span>
+        <span class="v"><span class="pill {{ status_badges.get(today_dose.status, 'pill-default') | replace('badge-', 'pill-') }}">{{ dose_status_labels.get(today_dose.status, today_dose.status) }}</span></span>
+    </div>
+    {% if today_dose.status == 'planned' and today_dose.token_id %}
+    <a href="/dose/{{ today_dose.token_id }}" class="btn btn-primary" style="margin-top:12px;">✅ ยืนยันว่ากินยาแล้ว</a>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="card card-pad">
+    <div class="section-title">ความสม่ำเสมอในการกินยา</div>
+    <div class="row"><span class="k">7 วันที่ผ่านมา</span><span class="v">{{ adh7.percent }}%</span></div>
+    <div class="row"><span class="k">30 วันที่ผ่านมา</span><span class="v">{{ adh30.percent }}%</span></div>
+    <div class="row"><span class="k">กินยาต่อเนื่อง</span><span class="v">🔥 {{ streak }} วัน</span></div>
+    {% if weekly_mg %}
+    <div class="row"><span class="k">ขนาดยารวมต่อสัปดาห์</span><span class="v">{{ weekly_mg }} mg</span></div>
+    {% endif %}
+
+    <div style="display:grid; grid-template-columns:repeat(15, 1fr); gap:3px; margin-top:14px;">
+        {% for day in heatmap[-45:] %}
+        <div title="{{ day.date }}" style="aspect-ratio:1; border-radius:3px; background:
+            {%- if day.status == 'taken' %}#059669
+            {%- elif day.status == 'late' %}#34D399
+            {%- elif day.status == 'missed' %}#DC2626
+            {%- elif day.status == 'planned' %}#CBD5E1
+            {%- else %}#F1F5F9{% endif %};"></div>
+        {% endfor %}
+    </div>
+    <div style="font-size:11px; color:#94A3B8; margin-top:6px;">45 วันล่าสุด · เขียว = กินยาแล้ว · แดง = ขาดยา</div>
+</div>
+
+<div class="card card-pad">
+    <div class="section-title">ผลตรวจ INR</div>
+    {% if latest_lab %}
+    <div class="notice notice-{{ 'success' if assessment.band == 'in_range' else ('warning' if assessment.urgency < 2 else 'danger') }}" style="margin-bottom:12px;">
+        <strong>ค่าล่าสุด {{ latest_lab.value }} — {{ assessment.label }}</strong><br>
+        {{ assessment.advice }}
+    </div>
+    {% for lab in labs[:5] %}
+    <div class="row">
+        <span class="k">{{ lab.test_date | thai_date }}</span>
+        <span class="v">{{ lab.value }} <span class="pill {{ 'pill-success' if lab.in_range else 'pill-danger' }}">{{ 'ในเป้าหมาย' if lab.in_range else 'นอกเป้าหมาย' }}</span></span>
+    </div>
+    {% endfor %}
+    {% if ttr is not none %}
+    <div class="row"><span class="k">อยู่ในเป้าหมาย (TTR)</span><span class="v">{{ ttr }}% ของเวลา</span></div>
+    {% endif %}
+    {% else %}
+    <p style="font-size:13px; color:#64748B;">ยังไม่มีผลตรวจ INR ในระบบ</p>
+    {% endif %}
+</div>
+
+{% if appointments %}
+<div class="card card-pad">
+    <div class="section-title">นัดหมายครั้งถัดไป</div>
+    {% for appointment in appointments %}
+    <div class="row">
+        <span class="k">{{ appointment_types.get(appointment.appointment_type, 'นัดหมาย') }}</span>
+        <span class="v">{{ appointment.appointment_date | thai_date }}{% if appointment.appointment_time %} {{ appointment.appointment_time }} น.{% endif %}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if upcoming %}
+<div class="card card-pad">
+    <div class="section-title">แผนการกินยา 14 วันข้างหน้า</div>
+    {% for dose in upcoming %}
+    <div class="row">
+        <span class="k">{{ dose.scheduled_date | thai_date }}</span>
+        <span class="v">{{ dose.warfarin_mg }} mg · {{ dose.scheduled_time }} น.</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card card-pad">
+    <div class="section-title">ข้อควรรู้</div>
+    {% for topic in topics[:4] %}
+    <div style="margin-bottom:12px;">
+        <div style="font-size:13px; font-weight:700; margin-bottom:4px;">{{ topic.icon }} {{ topic.title }}</div>
+        <ul style="margin-left:18px; font-size:12px; color:#64748B; line-height:1.7;">
+            {% for point in topic.points[:3] %}
+            <li>{{ point }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+    <a href="/education" class="btn btn-ghost">อ่านคู่มือฉบับเต็ม →</a>
+    <a href="/report/symptom/{{ token }}" class="btn btn-ghost" style="margin-top:8px;">แจ้งอาการผิดปกติ →</a>
+</div>
+{% endblock %}

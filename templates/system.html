@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}สถานะระบบ{% endblock %}
+{% block content %}
+<div class="space-y-5">
+    <div>
+        <h1 class="text-[22px] font-bold tracking-tight">สถานะระบบ</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">เวอร์ชัน {{ app_version }} · โครงสร้างฐานข้อมูล {{ schema_version }}/{{ latest_schema }}</p>
+    </div>
+
+    {% if schema_version < latest_schema %}
+    <div class="flash flash-danger"><div>โครงสร้างฐานข้อมูลยังไม่อัปเดต — รัน <code>python manage.py migrate</code> แล้วรีสตาร์ทระบบ</div></div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">การตั้งค่า</div></div>
+            <div class="p-5 space-y-2 text-[13px]">
+                <div class="flex justify-between"><span style="color:#8A9BAA;">สภาพแวดล้อม</span><strong>{{ settings.env }}</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">Base URL</span><strong style="word-break:break-all;">{{ settings.base_url }}</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">ฐานข้อมูล</span><strong>{{ settings.db_path }}</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">คุกกี้แบบ Secure</span><strong>{{ 'เปิด' if settings.cookie_secure else 'ปิด' }}</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">ป้องกัน CSRF</span><strong>{{ 'เปิด' if settings.csrf_enabled else 'ปิด' }}</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">อายุเซสชัน</span><strong>{{ settings.session_hours }} ชั่วโมง</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">ตัวจับเวลางาน</span><strong>{{ 'ทำงาน' if settings.enable_scheduler else 'ปิด' }}</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">เตือนยาใกล้หมดเมื่อเหลือ</span><strong>{{ settings.low_stock_threshold }} วัน</strong></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">การเชื่อมต่อ LINE</div></div>
+            <div class="p-5 space-y-2 text-[13px]">
+                <div class="flex justify-between"><span style="color:#8A9BAA;">ส่งข้อความ (Access Token)</span>
+                    <span class="badge {{ 'badge-success' if line.push else 'badge-danger' }}">{{ 'พร้อมใช้งาน' if line.push else 'ยังไม่ตั้งค่า' }}</span></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">รับข้อความ (Channel Secret)</span>
+                    <span class="badge {{ 'badge-success' if line.webhook else 'badge-danger' }}">{{ 'พร้อมใช้งาน' if line.webhook else 'ยังไม่ตั้งค่า' }}</span></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">LINE SDK</span>
+                    <span class="badge {{ 'badge-success' if line.sdk else 'badge-warning' }}">{{ 'ติดตั้งแล้ว' if line.sdk else 'ใช้ HTTP โดยตรง' }}</span></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">Flex Message</span>
+                    <span class="badge {{ 'badge-success' if line.flex else 'badge-warning' }}">{{ 'รองรับ' if line.flex else 'ใช้ข้อความธรรมดา' }}</span></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">รหัสลงทะเบียนเจ้าหน้าที่</span>
+                    <span class="badge {{ 'badge-success' if line.staff_code else 'badge-default' }}">{{ 'ตั้งค่าแล้ว' if line.staff_code else 'ยังไม่ตั้งค่า' }}</span></div>
+                <div class="pt-2" style="border-top:1px solid #F1F5F9;">
+                    <div class="text-[11px] mb-1" style="color:#8A9BAA;">Webhook URL ที่ต้องตั้งใน LINE Developers Console</div>
+                    <code style="font-size:11px; background:#F1F5F9; padding:6px 8px; border-radius:6px; display:block; word-break:break-all;">{{ settings.base_url }}/webhook</code>
+                </div>
+                {% if line.richmenu and line.push %}
+                <form method="POST" action="/system/rich-menu" class="pt-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">สร้าง Rich Menu ใหม่</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">งานตามกำหนดเวลา (วันนี้)</div></div>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead><tr><th>งาน</th><th>เริ่ม</th><th>สถานะ</th><th>ผลลัพธ์</th></tr></thead>
+                    <tbody>
+                        {% for job in jobs %}
+                        <tr>
+                            <td class="font-semibold">{{ job.name }}</td>
+                            <td class="text-[12px]" style="color:#8A9BAA;">{{ job.started_at | datetime_str }}</td>
+                            <td><span class="badge {% if job.status == 'done' %}badge-success{% elif job.status == 'failed' %}badge-danger{% else %}badge-warning{% endif %}">{{ job.status }}</span></td>
+                            <td class="text-[12px]" style="color:#4B5E6D;">{{ job.detail or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center py-8" style="color:#8A9BAA;">ยังไม่มีงานที่รันวันนี้</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-5" style="border-top:1px solid #E2E8F0;">
+                <form method="POST" action="/system/run-job" class="flex gap-2 items-end"
+                      onsubmit="return confirm('รันงานนี้ทันที? อาจมีการส่งข้อความ LINE ถึงผู้ป่วยจริง');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="flex-1">
+                        <label class="label" for="job">รันงานด้วยตนเอง</label>
+                        <select class="input" id="job" name="job">
+                            {% for name in job_names %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-secondary">รัน</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">บัญชี LINE ของเจ้าหน้าที่ที่รับแจ้งอาการ</div></div>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead><tr><th>ชื่อ</th><th>ลงทะเบียนเมื่อ</th><th class="text-center">สถานะ</th></tr></thead>
+                    <tbody>
+                        {% for recipient in recipients %}
+                        <tr>
+                            <td class="font-semibold">{{ recipient.display_name or recipient.line_user_id[:12] ~ '…' }}</td>
+                            <td class="text-[12px]" style="color:#8A9BAA;">{{ recipient.registered_at | datetime_str }}</td>
+                            <td class="text-center"><span class="badge {{ 'badge-success' if recipient.is_active else 'badge-default' }}">{{ 'รับแจ้ง' if recipient.is_active else 'ยกเลิกแล้ว' }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-center py-8" style="color:#8A9BAA;">
+                            ยังไม่มีเจ้าหน้าที่ลงทะเบียน — ตั้งค่า LINE_STAFF_REGISTER_CODE แล้วให้เภสัชกรพิมพ์รหัสนั้นใน LINE
+                        </td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -3,34 +3,33 @@
 {% block content %}
 <div class="space-y-6">
 
-    <!-- Page header -->
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-            <h1 class="text-[22px] font-bold tracking-tight" style="color:#0F1923;">แดชบอร์ด</h1>
-            <p class="text-[13px] mt-1" style="color:#8A9BAA;">ภาพรวมการติดตามผู้ป่วยวาร์ฟาริน</p>
+            <h1 class="text-[22px] font-bold tracking-tight">แดชบอร์ด</h1>
+            <p class="text-[13px] mt-1" style="color:#8A9BAA;">ภาพรวมการติดตามผู้ป่วยวาร์ฟาริน · {{ today() | thai_date }}</p>
         </div>
         <div class="flex items-center gap-2">
             {% if line_configured %}
             <button onclick="document.getElementById('broadcastModal').classList.remove('hidden')" class="btn btn-success">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
-                ส่ง LINE ทุกคน
+                ส่งข้อความ LINE
             </button>
             {% else %}
-            <span class="badge badge-warning">⚠️ LINE ยังไม่ตั้งค่า</span>
+            <span class="badge badge-warning">⚠️ ยังไม่ได้ตั้งค่า LINE</span>
             {% endif %}
         </div>
     </div>
 
-    <!-- Urgent banner -->
     {% if urgent_symptoms %}
     <div class="rounded-xl p-4 flex gap-3" style="background:#FEF2F2; border:1px solid #FECACA;">
         <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="#991B1B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-        <div>
-            <div class="text-sm font-semibold" style="color:#991B1B;">รายงานอาการที่ต้องตรวจสอบ</div>
+        <div class="flex-1">
+            <div class="text-sm font-semibold" style="color:#991B1B;">รายงานอาการที่ต้องตรวจสอบด่วน</div>
             <div class="mt-1 space-y-0.5">
-                {% for s in urgent_symptoms %}
-                <a href="/patients/{{ s.patient_id }}" class="block text-xs hover:underline" style="color:#B91C1C;">
-                    • {{ s.full_name }} — ระดับ {{ s.severity }}/5 — {{ s.created_at[:16] if s.created_at else s.report_date }}{% if s.bleeding %} · มีเลือดออก{% endif %}
+                {% for report in urgent_symptoms %}
+                <a href="/symptoms" class="block text-xs hover:underline" style="color:#B91C1C;">
+                    • {{ report.full_name }} — ระดับ {{ report.severity }}/5 — {{ report.created_at | datetime_str }}
+                    {%- if report.bleeding %} · มีเลือดออก{% endif %} · เลขรับเรื่อง {{ report.ticket_code }}
                 </a>
                 {% endfor %}
             </div>
@@ -38,201 +37,202 @@
     </div>
     {% endif %}
 
-    <!-- Main stat cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {% set cards = [
+            ('ผู้ป่วยที่ติดตาม', active_patients, '#0284C7', 'จากทั้งหมด ' ~ total_patients ~ ' ราย'),
+            ('กินยาแล้ววันนี้', today_taken, '#059669', 'จาก ' ~ today_total ~ ' มื้อ'),
+            ('ยังไม่ยืนยันวันนี้', today_pending, '#D97706', 'รอการยืนยัน'),
+            ('ขาดยาวันนี้', today_missed, '#DC2626', 'ต้องติดตาม')
+        ] %}
+        {% for label, value, color, sub in cards %}
         <div class="stat-card">
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:#8A9BAA;">ผู้ป่วยทั้งหมด</div>
-                    <div class="text-[30px] font-extrabold leading-none" style="color:#0284C7;">{{ total_patients }}</div>
-                </div>
-                <div class="w-11 h-11 rounded-[10px] flex items-center justify-center flex-shrink-0" style="background:rgba(2,132,199,.1); color:#0284C7;">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </div>
-            </div>
+            <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:#8A9BAA;">{{ label }}</div>
+            <div class="text-[30px] font-extrabold leading-none" style="color:{{ color }};">{{ value }}</div>
+            <div class="text-[11px] mt-1.5" style="color:#8A9BAA;">{{ sub }}</div>
         </div>
-        <div class="stat-card">
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:#8A9BAA;">กินยาวันนี้</div>
-                    <div class="text-[30px] font-extrabold leading-none" style="color:#059669;">{{ today_taken }}</div>
-                </div>
-                <div class="w-11 h-11 rounded-[10px] flex items-center justify-center flex-shrink-0" style="background:rgba(5,150,105,.1); color:#059669;">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:#8A9BAA;">ยังไม่ยืนยัน</div>
-                    <div class="text-[30px] font-extrabold leading-none" style="color:#D97706;">{{ today_pending }}</div>
-                </div>
-                <div class="w-11 h-11 rounded-[10px] flex items-center justify-center flex-shrink-0" style="background:rgba(217,119,6,.1); color:#D97706;">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:#8A9BAA;">พลาดวันนี้</div>
-                    <div class="text-[30px] font-extrabold leading-none" style="color:#DC2626;">{{ today_missed }}</div>
-                </div>
-                <div class="w-11 h-11 rounded-[10px] flex items-center justify-center flex-shrink-0" style="background:rgba(220,38,38,.1); color:#DC2626;">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-            </div>
-        </div>
+        {% endfor %}
     </div>
 
-    <!-- Secondary stats -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="bg-white border rounded-[10px] p-4" style="border-color:#E2E8F0;">
-            <div class="text-[11px] font-medium uppercase tracking-wider mb-1.5" style="color:#8A9BAA;">Adherence เฉลี่ย 7 วัน</div>
-            <div class="text-[22px] font-extrabold {% if adherence_avg >= 80 %}text-emerald-600{% elif adherence_avg >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ adherence_avg }}%</div>
-        </div>
-        <div class="bg-white border rounded-[10px] p-4" style="border-color:#E2E8F0;">
-            <div class="text-[11px] font-medium uppercase tracking-wider mb-1.5" style="color:#8A9BAA;">เชื่อม LINE แล้ว</div>
-            <div class="text-[22px] font-extrabold" style="color:#0284C7;">{{ line_linked }} / {{ active_patients }}</div>
-        </div>
-        <div class="bg-white border rounded-[10px] p-4" style="border-color:#E2E8F0;">
-            <div class="text-[11px] font-medium uppercase tracking-wider mb-1.5" style="color:#8A9BAA;">ผู้ป่วยเสี่ยง</div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <a href="/dashboard/at-risk" class="bg-white border rounded-[10px] p-4 hover:border-sky-300" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">ผู้ป่วยเสี่ยง</div>
             <div class="text-[22px] font-extrabold" style="color:#DC2626;">{{ at_risk_patients|length }}</div>
+        </a>
+        <div class="bg-white border rounded-[10px] p-4" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">สม่ำเสมอเฉลี่ย 7 วัน</div>
+            <div class="text-[22px] font-extrabold {{ adherence_avg | percent_class }}">{{ adherence_avg }}%</div>
         </div>
         <div class="bg-white border rounded-[10px] p-4" style="border-color:#E2E8F0;">
-            <div class="text-[11px] font-medium uppercase tracking-wider mb-1.5" style="color:#8A9BAA;">อาการรุนแรง 7 วัน</div>
-            <div class="text-[22px] font-extrabold" style="color:#D97706;">{{ urgent_symptoms|length }}</div>
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">INR นอกเป้าหมาย</div>
+            <div class="text-[22px] font-extrabold" style="color:#D97706;">{{ inr_out_of_range }}</div>
+        </div>
+        <a href="/appointments" class="bg-white border rounded-[10px] p-4 hover:border-sky-300" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">เลยกำหนดตรวจ INR</div>
+            <div class="text-[22px] font-extrabold" style="color:#B91C1C;">{{ inr_overdue_count }}</div>
+        </a>
+        <div class="bg-white border rounded-[10px] p-4" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">ยาใกล้หมด</div>
+            <div class="text-[22px] font-extrabold" style="color:#B45309;">{{ low_stock|length }}</div>
+        </div>
+        <div class="bg-white border rounded-[10px] p-4" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">เชื่อม LINE แล้ว</div>
+            <div class="text-[22px] font-extrabold" style="color:#0284C7;">{{ line_linked }}<span class="text-sm font-normal" style="color:#8A9BAA;">/{{ active_patients }}</span></div>
         </div>
     </div>
 
-    <!-- Two column -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-        <!-- At-risk -->
         <div class="card">
             <div class="card-header">
-                <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="#DC2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-                    <div>
-                        <div class="text-sm font-semibold" style="color:#0F1923;">ผู้ป่วยเสี่ยง</div>
-                        <div class="text-xs" style="color:#8A9BAA;">{{ at_risk_patients|length }} ราย</div>
-                    </div>
+                <div>
+                    <div class="text-sm font-semibold">ผู้ป่วยที่ต้องติดตาม</div>
+                    <div class="text-xs" style="color:#8A9BAA;">{{ at_risk_patients|length }} ราย</div>
                 </div>
-                <a href="/patients" class="text-xs font-medium" style="color:#0284C7;">ดูทั้งหมด →</a>
+                <a href="/dashboard/at-risk" class="text-xs font-medium" style="color:#0284C7;">ดูทั้งหมด →</a>
             </div>
-            <div>
-                {% for item in at_risk_patients %}
-                <a href="/patients/{{ item.patient.patient_id }}" class="flex items-center gap-3 px-6 py-3 hover:bg-slate-50 {% if not loop.last %}border-b{% endif %}" style="border-color:#E2E8F0;">
-                    <div class="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style="background:#0284C7;">
-                        {{ item.patient.full_name[3:5] if item.patient.full_name|length > 3 else item.patient.full_name[:2] }}
-                    </div>
+            <div class="max-h-[420px] overflow-y-auto">
+                {% for item in at_risk_patients[:8] %}
+                <a href="/patients/{{ item.patient.patient_id }}" class="flex items-center gap-3 px-6 py-3 hover:bg-slate-50 border-b" style="border-color:#E2E8F0;">
                     <div class="flex-1 min-w-0">
-                        <div class="text-[13px] font-semibold mb-1.5" style="color:#0F1923;">{{ item.patient.full_name }}</div>
-                        <div class="flex items-center gap-2">
-                            <div class="flex-1 h-[5px] rounded-full overflow-hidden" style="background:#F0F4F8;">
-                                <div class="h-full rounded-full" style="width:{{ item.adherence.percent }}%; background:{% if item.adherence.percent >= 80 %}#059669{% elif item.adherence.percent >= 50 %}#D97706{% else %}#DC2626{% endif %};"></div>
-                            </div>
-                            <span class="text-xs font-bold" style="color:{% if item.adherence.percent >= 80 %}#059669{% elif item.adherence.percent >= 50 %}#D97706{% else %}#DC2626{% endif %};">{{ item.adherence.percent }}%</span>
-                        </div>
+                        <div class="text-[13px] font-semibold mb-1">{{ item.patient.full_name }}</div>
+                        <div class="text-[11px]" style="color:#8A9BAA;">{{ item.reasons | join(' · ') }}</div>
                     </div>
-                    <span class="badge {% if item.adherence.percent < 50 %}badge-danger{% else %}badge-warning{% endif %}">
-                        {% if item.adherence.percent < 50 %}เสี่ยงสูง{% else %}เฝ้าระวัง{% endif %}
+                    <span class="badge {% if item.adherence.percent < 50 or item.consecutive_missed >= 3 %}badge-danger{% else %}badge-warning{% endif %}">
+                        {{ item.adherence.percent }}%
                     </span>
                 </a>
+                {% else %}
+                <div class="text-center text-sm py-12" style="color:#8A9BAA;">ไม่มีผู้ป่วยที่ต้องติดตามเป็นพิเศษ 🎉</div>
                 {% endfor %}
-                {% if not at_risk_patients %}
-                <div class="text-center text-sm py-12" style="color:#8A9BAA;">ไม่มีผู้ป่วยเสี่ยงในขณะนี้ 🎉</div>
-                {% endif %}
             </div>
         </div>
 
-        <!-- Recent activity -->
         <div class="card">
             <div class="card-header">
-                <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="#0284C7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <div>
-                        <div class="text-sm font-semibold" style="color:#0F1923;">กิจกรรมล่าสุด</div>
-                        <div class="text-xs" style="color:#8A9BAA;">การยืนยันยาวันนี้</div>
-                    </div>
+                <div>
+                    <div class="text-sm font-semibold">การยืนยันกินยาล่าสุด</div>
+                    <div class="text-xs" style="color:#8A9BAA;">10 รายการล่าสุด</div>
                 </div>
             </div>
-            <div class="max-h-96 overflow-y-auto">
-                {% for act in recent_activity %}
-                <div class="flex items-center gap-3 px-6 py-3 {% if not loop.last %}border-b{% endif %}" style="border-color:#E2E8F0;">
-                    <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style="background:{% if act.status in ('taken','late') %}#ECFDF5{% else %}#FFFBEB{% endif %};">
-                        {% if act.status in ('taken','late') %}
-                        <svg class="w-4 h-4" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
-                        {% else %}
-                        <svg class="w-4 h-4" fill="none" stroke="#D97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        {% endif %}
-                    </div>
+            <div class="max-h-[420px] overflow-y-auto">
+                {% for activity in recent_activity %}
+                <a href="/patients/{{ activity.patient_id }}" class="flex items-center gap-3 px-6 py-3 hover:bg-slate-50 border-b" style="border-color:#E2E8F0;">
                     <div class="flex-1 min-w-0">
-                        <div class="text-[13px]" style="color:#0F1923;"><span class="font-semibold">{{ act.full_name }}</span><span style="color:#8A9BAA;"> · {{ act.warfarin_mg }} mg</span></div>
-                        <div class="text-[11px] mt-0.5" style="color:#8A9BAA;">{{ act.confirmed_at[:16] if act.confirmed_at else '' }}</div>
+                        <div class="text-[13px]"><span class="font-semibold">{{ activity.full_name }}</span><span style="color:#8A9BAA;"> · {{ activity.warfarin_mg }} mg</span></div>
+                        <div class="text-[11px] mt-0.5" style="color:#8A9BAA;">{{ activity.confirmed_at | datetime_str }} · ยืนยันโดย{{ {'patient':'ผู้ป่วย','caregiver':'ผู้ดูแล','staff':'เจ้าหน้าที่'}.get(activity.confirm_source, activity.confirm_source or 'ผู้ป่วย') }}</div>
                     </div>
-                    {% if act.status == 'taken' %}<span class="badge badge-success">กินแล้ว</span>
-                    {% elif act.status == 'late' %}<span class="badge badge-warning">กินช้า</span>{% endif %}
-                </div>
+                    <span class="badge {{ status_badges.get(activity.status, 'badge-default') }}">{{ dose_status_labels.get(activity.status, activity.status) }}</span>
+                </a>
+                {% else %}
+                <div class="text-center text-sm py-12" style="color:#8A9BAA;">ยังไม่มีการยืนยันกินยา</div>
                 {% endfor %}
-                {% if not recent_activity %}
-                <div class="text-center text-sm py-12" style="color:#8A9BAA;">ยังไม่มีกิจกรรมวันนี้</div>
-                {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Broadcast modal -->
-    <div id="broadcastModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">เลยกำหนดตรวจ INR</div></div>
+            <div class="max-h-72 overflow-y-auto">
+                {% for patient in inr_overdue %}
+                <a href="/patients/{{ patient.patient_id }}" class="flex items-center justify-between px-6 py-2.5 hover:bg-slate-50 border-b text-[13px]" style="border-color:#E2E8F0;">
+                    <span>{{ patient.full_name }}</span>
+                    <span class="badge badge-danger">{{ patient.next_inr_date | thai_date }}</span>
+                </a>
+                {% else %}
+                <div class="text-center text-sm py-10" style="color:#8A9BAA;">ไม่มีผู้ป่วยเลยกำหนด</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">นัดหมาย 7 วันข้างหน้า</div></div>
+            <div class="max-h-72 overflow-y-auto">
+                {% for appointment in upcoming_appointments %}
+                <a href="/patients/{{ appointment.patient_id }}" class="flex items-center justify-between px-6 py-2.5 hover:bg-slate-50 border-b text-[13px]" style="border-color:#E2E8F0;">
+                    <span>{{ appointment.full_name }}</span>
+                    <span class="badge badge-primary">{{ appointment.appointment_date | thai_date }}</span>
+                </a>
+                {% else %}
+                <div class="text-center text-sm py-10" style="color:#8A9BAA;">ไม่มีนัดหมายในสัปดาห์นี้</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">ยาใกล้หมด</div></div>
+            <div class="max-h-72 overflow-y-auto">
+                {% for item in low_stock %}
+                <a href="/patients/{{ item.patient.patient_id }}" class="flex items-center justify-between px-6 py-2.5 hover:bg-slate-50 border-b text-[13px]" style="border-color:#E2E8F0;">
+                    <span>{{ item.patient.full_name }}</span>
+                    <span class="badge badge-amber">เหลือ ~{{ item.days_left }} วัน</span>
+                </a>
+                {% else %}
+                <div class="text-center text-sm py-10" style="color:#8A9BAA;">ไม่มีผู้ป่วยยาใกล้หมด</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {% if line_configured %}
+    <div id="broadcastModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl p-7 max-w-md w-full shadow-2xl">
-            <h3 class="text-base font-bold" style="color:#0F1923;">ส่งข้อความ LINE</h3>
-            <p class="text-xs mt-1 mb-4" style="color:#8A9BAA;">เลือกกลุ่มเป้าหมายแล้วพิมพ์ข้อความ</p>
-            <div class="mb-3">
-                <label class="label">กลุ่มเป้าหมาย</label>
-                <select id="broadcastTarget" onchange="updatePreview()" class="input">
-                    <option value="all">ทุกคนที่เชื่อม LINE ({{ line_linked }} คน)</option>
-                    <option value="low_adherence">Adherence &lt; 50% (30 วัน)</option>
-                    <option value="missed_yesterday">พลาดยาเมื่อวาน</option>
-                    <option value="high_risk">กลุ่มเสี่ยง</option>
-                </select>
-                <p id="broadcastPreview" class="text-xs mt-1 h-4" style="color:#0284C7;"></p>
-            </div>
-            <textarea id="broadcastText" rows="4" placeholder="พิมพ์ข้อความที่นี่..." class="input" style="resize:vertical;"></textarea>
-            <div class="flex gap-2 mt-4">
-                <button onclick="sendBroadcast()" class="btn btn-success flex-1 justify-center">ส่ง</button>
-                <button onclick="document.getElementById('broadcastModal').classList.add('hidden')" class="btn btn-secondary">ยกเลิก</button>
-            </div>
-            <p id="broadcastResult" class="text-xs mt-2"></p>
+            <h3 class="text-base font-bold">ส่งข้อความ LINE ถึงผู้ป่วย</h3>
+            <p class="text-xs mt-1 mb-4" style="color:#8A9BAA;">เลือกกลุ่มเป้าหมายแล้วพิมพ์ข้อความ ระบบจะบันทึกไว้ในประวัติการแจ้งเตือน</p>
+            <form method="POST" action="/line/broadcast" onsubmit="return confirmBroadcast()">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="mb-3">
+                    <label class="label" for="broadcastTarget">กลุ่มเป้าหมาย</label>
+                    <select id="broadcastTarget" name="target" onchange="updatePreview()" class="input">
+                        <option value="all">ผู้ป่วยที่เชื่อม LINE ทั้งหมด</option>
+                        <option value="low_adherence">ความสม่ำเสมอ &lt; 50% (30 วัน)</option>
+                        <option value="missed_yesterday">ขาดยาเมื่อวาน</option>
+                        <option value="inr_out_of_range">INR ล่าสุดนอกเป้าหมาย</option>
+                        <option value="inr_due">ถึงกำหนดตรวจ INR</option>
+                        <option value="high_risk">กลุ่มเสี่ยงสูง</option>
+                    </select>
+                    <p id="broadcastPreview" class="text-xs mt-1 h-4" style="color:#0284C7;"></p>
+                </div>
+                <label class="label" for="broadcastText">ข้อความ</label>
+                <textarea id="broadcastText" name="message" rows="4" maxlength="1500" required
+                          placeholder="พิมพ์ข้อความที่นี่…" class="input" style="resize:vertical;"></textarea>
+                <div class="flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-success flex-1 justify-center">ส่งข้อความ</button>
+                    <button type="button" onclick="document.getElementById('broadcastModal').classList.add('hidden')" class="btn btn-secondary">ยกเลิก</button>
+                </div>
+            </form>
         </div>
     </div>
+    {% endif %}
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 async function updatePreview() {
     const target = document.getElementById('broadcastTarget').value;
     const preview = document.getElementById('broadcastPreview');
-    try { const r = await fetch(`/api/broadcast-preview?target=${target}`); const j = await r.json(); preview.textContent = `จะส่งถึง ${j.count} คน`; } catch { preview.textContent = ''; }
-}
-document.getElementById('broadcastModal').addEventListener('transitionend', () => {
-    if (!document.getElementById('broadcastModal').classList.contains('hidden')) updatePreview();
-});
-async function sendBroadcast() {
-    const text = document.getElementById('broadcastText').value.trim();
-    const target = document.getElementById('broadcastTarget').value;
-    const result = document.getElementById('broadcastResult');
-    if (!text) { result.textContent='กรุณาพิมพ์ข้อความ'; result.style.color='#DC2626'; return; }
-    if (!confirm(`ยืนยันส่งข้อความ: ${document.getElementById('broadcastPreview').textContent}?`)) return;
-    result.textContent='กำลังส่ง...'; result.style.color='#8A9BAA';
-    const fd = new FormData(); fd.append('message', text); fd.append('target', target);
+    preview.textContent = 'กำลังตรวจสอบ…';
     try {
-        const r = await fetch('/line/broadcast', { method:'POST', body:fd });
-        const j = await r.json();
-        if (j.ok) { result.textContent=`✅ ส่งสำเร็จ ${j.sent} ราย, ล้มเหลว ${j.failed} ราย`; result.style.color='#059669';
-            document.getElementById('broadcastText').value='';
-            setTimeout(() => document.getElementById('broadcastModal').classList.add('hidden'), 2000);
-        } else { result.textContent='❌ '+(j.error||'error'); result.style.color='#DC2626'; }
-    } catch (e) { result.textContent='❌ '+e.message; result.style.color='#DC2626'; }
+        const response = await fetch(`/api/broadcast-preview?target=${encodeURIComponent(target)}`);
+        const data = await response.json();
+        preview.textContent = `จะส่งถึง ${data.count} ราย (จากผู้ที่เชื่อม LINE ${data.eligible} ราย)`;
+    } catch (error) {
+        preview.textContent = '';
+    }
+}
+function confirmBroadcast() {
+    const preview = document.getElementById('broadcastPreview').textContent || '';
+    return confirm(`ยืนยันการส่งข้อความ? ${preview}`);
+}
+const modal = document.getElementById('broadcastModal');
+if (modal) {
+    document.addEventListener('DOMContentLoaded', () => {
+        const observer = new MutationObserver(() => {
+            if (!modal.classList.contains('hidden')) updatePreview();
+        });
+        observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+    });
 }
 </script>
 {% endblock %}

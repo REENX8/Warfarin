@@ -1,28 +1,40 @@
 {% extends "base.html" %}
 {% block title %}ผู้ป่วย{% endblock %}
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-5">
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-            <h1 class="text-[22px] font-bold tracking-tight" style="color:#0F1923;">ผู้ป่วย</h1>
-            <p class="text-[13px] mt-1" style="color:#8A9BAA;">จัดการข้อมูลผู้ป่วยคลินิกวาร์ฟาริน</p>
+            <h1 class="text-[22px] font-bold tracking-tight">ผู้ป่วย</h1>
+            <p class="text-[13px] mt-1" style="color:#8A9BAA;">พบ {{ total }} ราย</p>
         </div>
+        {% if user.role in ('admin', 'pharmacist', 'nurse') %}
         <a href="/patients/new" class="btn btn-primary">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
             เพิ่มผู้ป่วย
         </a>
+        {% endif %}
     </div>
 
-    <!-- Search -->
-    <form method="GET" action="/patients" class="max-w-sm">
-        <div class="relative">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" stroke="#8A9BAA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" name="q" value="{{ q }}" placeholder="ค้นหาชื่อ หรือ HN…" class="input" style="padding-left:34px;">
+    <form method="GET" action="/patients" class="flex flex-wrap gap-2 items-end">
+        <div class="flex-1 min-w-[200px] max-w-sm">
+            <label class="label" for="q">ค้นหา</label>
+            <input type="search" id="q" name="q" value="{{ q }}" placeholder="ชื่อ, HN หรือเบอร์โทร…" class="input">
         </div>
+        <div style="width:150px;">
+            <label class="label" for="status">สถานะ</label>
+            <select id="status" name="status" class="input">
+                <option value="active" {% if status == 'active' %}selected{% endif %}>กำลังติดตาม</option>
+                <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>ปิดบัญชีแล้ว</option>
+                <option value="all" {% if status == 'all' %}selected{% endif %}>ทั้งหมด</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary">ค้นหา</button>
+        {% if q or status != 'active' %}
+        <a href="/patients" class="btn btn-ghost">ล้างตัวกรอง</a>
+        {% endif %}
     </form>
 
-    <!-- Table -->
-    <div class="card overflow-hidden" style="padding:0;">
+    <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="data-table">
                 <thead>
@@ -30,42 +42,74 @@
                         <th>HN</th>
                         <th>ชื่อ-สกุล</th>
                         <th class="text-center hidden sm:table-cell">อายุ</th>
-                        <th class="hidden md:table-cell">วินิจฉัย</th>
+                        <th class="hidden lg:table-cell">ข้อบ่งใช้</th>
+                        <th class="text-center">สม่ำเสมอ 7 วัน</th>
+                        <th class="text-center hidden md:table-cell">INR ล่าสุด</th>
                         <th class="text-center">สถานะ</th>
                         <th class="text-center">จัดการ</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for p in patients %}
-                    <tr onclick="window.location='/patients/{{ p.patient_id }}'" class="cursor-pointer">
-                        <td style="color:#8A9BAA; font-weight:500;">{{ p.hn or '-' }}</td>
+                    {% for patient in patients %}
+                    <tr>
+                        <td style="color:#8A9BAA; font-weight:500;">{{ patient.hn or '-' }}</td>
                         <td>
-                            <div class="flex items-center gap-2.5">
+                            <a href="/patients/{{ patient.patient_id }}" class="flex items-center gap-2.5 hover:underline">
                                 <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0" style="background:#0284C7;">
-                                    {{ p.full_name[3:5] if p.full_name|length > 3 else p.full_name[:2] }}
+                                    {{ patient.full_name[:1] }}
                                 </div>
-                                <span class="font-semibold" style="color:{% if p.active %}#0F1923{% else %}#8A9BAA{% endif %};">{{ p.full_name }}</span>
-                            </div>
+                                <span class="font-semibold" style="color:{% if patient.active %}#0F1923{% else %}#8A9BAA{% endif %};">{{ patient.full_name }}</span>
+                                {% if patient.line_user_id %}<span class="badge badge-primary">LINE</span>{% endif %}
+                            </a>
                         </td>
-                        <td class="text-center hidden sm:table-cell" style="color:#4B5E6D;">{{ p.age_years or '-' }}</td>
-                        <td class="hidden md:table-cell" style="color:#4B5E6D; font-size:12px;">{{ p.diagnosis or p.chronic_conditions or '-' }}</td>
+                        <td class="text-center hidden sm:table-cell" style="color:#4B5E6D;">{{ patient.age_years or '-' }}</td>
+                        <td class="hidden lg:table-cell" style="color:#4B5E6D; font-size:12px;">
+                            {{ indications.get(patient.indication, {}).get('label') or patient.diagnosis or '-' }}
+                        </td>
                         <td class="text-center">
-                            {% if p.active %}<span class="badge badge-success">Active</span>
+                            {% if patient.adherence and patient.adherence.total %}
+                            <span class="font-bold {{ patient.adherence.percent | percent_class }}">{{ patient.adherence.percent }}%</span>
+                            {% else %}
+                            <span style="color:#CBD5E1;">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center hidden md:table-cell">
+                            {% if patient.last_inr %}
+                            <span class="badge {{ 'badge-success' if patient.last_inr.in_range else 'badge-danger' }}">{{ patient.last_inr.value }}</span>
+                            {% else %}
+                            <span style="color:#CBD5E1;">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if patient.active %}<span class="badge badge-success">ติดตามอยู่</span>
                             {% else %}<span class="badge badge-default">ปิดบัญชี</span>{% endif %}
                         </td>
-                        <td class="text-center" onclick="event.stopPropagation()">
-                            <a href="/patients/{{ p.patient_id }}" class="text-xs font-medium" style="color:#0284C7;">ดู</a>
+                        <td class="text-center">
+                            <a href="/patients/{{ patient.patient_id }}" class="text-xs font-medium" style="color:#0284C7;">ดู</a>
+                            {% if user.role in ('admin', 'pharmacist', 'nurse') %}
                             <span style="color:#E2E8F0;" class="mx-2">·</span>
-                            <a href="/patients/{{ p.patient_id }}/edit" class="text-xs" style="color:#8A9BAA;">แก้ไข</a>
+                            <a href="/patients/{{ patient.patient_id }}/edit" class="text-xs" style="color:#8A9BAA;">แก้ไข</a>
+                            {% endif %}
                         </td>
                     </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="text-center py-16" style="color:#8A9BAA;">ไม่พบข้อมูลผู้ป่วย</td></tr>
                     {% endfor %}
-                    {% if not patients %}
-                    <tr><td colspan="6" class="text-center py-16" style="color:#8A9BAA;">ไม่พบข้อมูลผู้ป่วย</td></tr>
-                    {% endif %}
                 </tbody>
             </table>
         </div>
+
+        {% if total_pages > 1 %}
+        <div class="pager">
+            {% if page > 1 %}
+            <a href="?q={{ q }}&status={{ status }}&page={{ page - 1 }}">← ก่อนหน้า</a>
+            {% endif %}
+            <span class="current">{{ page }} / {{ total_pages }}</span>
+            {% if page < total_pages %}
+            <a href="?q={{ q }}&status={{ status }}&page={{ page + 1 }}">ถัดไป →</a>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

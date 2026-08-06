@@ -1,33 +1,41 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ส่งรายงานอาการ | รพ.สุไหงปาดี</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-b from-emerald-50 to-white min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-sm text-center">
-        <div class="inline-flex items-center justify-center w-20 h-20 bg-emerald-100 rounded-full mb-4">
-            <svg class="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
-            </svg>
-        </div>
-        <h1 class="text-2xl font-bold text-slate-800 mb-2">ส่งรายงานสำเร็จ</h1>
-        <p class="text-slate-600 mb-6">เจ้าหน้าที่ได้รับข้อมูลของคุณแล้ว</p>
+{% extends "_public_base.html" %}
+{% block title %}ส่งรายงานอาการแล้ว{% endblock %}
+{% block content %}
 
-        {% if severity >= 4 %}
-        <div class="bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-700">
-            ⚠️ อาการของคุณอาจต้องการการดูแลเร่งด่วน<br>
-            กรุณาพบแพทย์หรือติดต่อ รพ.สุไหงปาดี ทันที
+<div class="card">
+    <div style="background:{% if result.urgent %}linear-gradient(160deg,#9F1239,#E11D48){% else %}linear-gradient(160deg,#065F46,#059669){% endif %}; padding:32px 26px; text-align:center;">
+        <div style="width:68px; height:68px; border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; font-size:30px;">
+            {% if result.urgent %}⚠️{% else %}✅{% endif %}
         </div>
-        {% else %}
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 text-sm text-slate-600">
-            เภสัชกรหรือพยาบาลจะติดต่อกลับเพื่อให้คำแนะนำ
-        </div>
+        <h2 style="font-size:21px; font-weight:800; color:#fff;">ส่งรายงานเรียบร้อย</h2>
+        <p style="font-size:13px; color:rgba(255,255,255,.85); margin-top:6px;">
+            เลขรับเรื่อง {{ result.ticket_code }}
+        </p>
+    </div>
+
+    <div class="card-pad">
+        <div class="notice {% if result.urgent %}notice-danger{% else %}notice-info{% endif %}" style="margin-bottom:14px; white-space:pre-line;">{{ result.auto_response }}</div>
+
+        {% if result.labels %}
+        <div class="section-title">อาการที่คุณแจ้ง</div>
+        {% for label in result.labels %}
+        <div class="row"><span class="k">•</span><span class="v">{{ label }}</span></div>
+        {% endfor %}
+        <div class="row"><span class="k">ความรุนแรง</span><span class="v">{{ severity }} / 5</span></div>
         {% endif %}
 
-        <p class="text-center text-xs text-slate-400 mt-8">ระบบติดตามยาวาร์ฟาริน | รพ.สุไหงปาดี</p>
+        {% if portal_token %}
+        <a href="/p/{{ portal_token }}" class="btn btn-dark" style="margin-top:14px;">กลับหน้าข้อมูลของฉัน</a>
+        {% endif %}
     </div>
-</body>
-</html>
+</div>
+
+<div class="notice notice-warning">
+    <strong>🚨 ต้องไปโรงพยาบาลทันทีหากมีอาการเหล่านี้</strong>
+    <ul style="margin:6px 0 0 18px;">
+        {% for flag in red_flags[:5] %}
+        <li>{{ flag }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

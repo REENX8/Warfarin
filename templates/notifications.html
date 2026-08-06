@@ -1,67 +1,64 @@
 {% extends "base.html" %}
 {% block title %}การแจ้งเตือน{% endblock %}
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-5">
     <div>
-        <h1 class="text-[22px] font-bold tracking-tight" style="color:#0F1923;">การแจ้งเตือน</h1>
-        <p class="text-[13px] mt-1" style="color:#8A9BAA;">ประวัติการส่ง LINE ทั้งหมด</p>
+        <h1 class="text-[22px] font-bold tracking-tight">ประวัติการแจ้งเตือน</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">
+            7 วันล่าสุด: ส่งสำเร็จ {{ stats.delivered }}/{{ stats.total }} ({{ stats.percent }}%)
+        </p>
     </div>
 
-    <div class="card" style="padding:0;">
-        <div class="card-header">
-            <div>
-                <div class="text-sm font-semibold" style="color:#0F1923;">Log การแจ้งเตือน</div>
-                <div class="text-xs mt-0.5" style="color:#8A9BAA;">{{ logs|length }} รายการ</div>
-            </div>
+    {% if stats.total and stats.percent < 80 %}
+    <div class="flash flash-warning">
+        <div>อัตราการส่งสำเร็จต่ำกว่า 80% — ตรวจสอบ LINE Channel Access Token และการเชื่อมบัญชีของผู้ป่วย</div>
+    </div>
+    {% endif %}
+
+    <form method="GET" action="/notifications" class="flex gap-2 items-end flex-wrap no-print">
+        <div style="width:220px;">
+            <label class="label" for="message_type">ประเภทข้อความ</label>
+            <select class="input" id="message_type" name="message_type" onchange="this.form.submit()">
+                <option value="">ทั้งหมด</option>
+                {% for key, label in message_types.items() %}
+                <option value="{{ key }}" {% if message_type == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
         </div>
+    </form>
+
+    <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>เวลา</th>
-                        <th>ผู้ป่วย</th>
-                        <th>ประเภท</th>
-                        <th>ข้อความ</th>
-                        <th class="text-center">สถานะ</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>เวลา</th><th>ผู้ป่วย</th><th>ประเภท</th><th>ข้อความ</th><th class="text-center">ส่งสำเร็จ</th></tr></thead>
                 <tbody>
                     {% for log in logs %}
                     <tr>
-                        <td style="color:#8A9BAA; white-space:nowrap; font-size:12px;">
-                            {{ log.sent_at[:16] if log.sent_at else '-' }}
-                        </td>
+                        <td class="text-[12px]" style="color:#8A9BAA; white-space:nowrap;">{{ log.sent_at | datetime_str }}</td>
                         <td>
-                            <a href="/patients/{{ log.patient_id }}" class="font-semibold hover:underline" style="color:#0F1923; font-size:13px;">
-                                {{ log.full_name or '—' }}
-                            </a>
+                            {% if log.patient_id %}
+                            <a href="/patients/{{ log.patient_id }}" class="font-semibold hover:underline" style="color:#0284C7;">{{ log.full_name or '-' }}</a>
+                            {% else %}<span style="color:#8A9BAA;">-</span>{% endif %}
                         </td>
-                        <td>
-                            {% if log.notification_type == 'reminder_1' %}<span class="badge badge-primary">เตือนครั้งที่ 1</span>
-                            {% elif log.notification_type == 'reminder_2' %}<span class="badge badge-warning">เตือนซ้ำ</span>
-                            {% elif log.notification_type == 'missed' %}<span class="badge badge-danger">พลาดยา</span>
-                            {% elif log.notification_type == 'caregiver' %}<span class="badge badge-purple">ผู้ดูแล</span>
-                            {% elif log.notification_type == 'broadcast' %}<span class="badge badge-success">Broadcast</span>
-                            {% else %}<span class="badge badge-default">{{ log.notification_type or '-' }}</span>{% endif %}
-                        </td>
-                        <td style="font-size:13px; color:#4B5E6D; max-width:280px;" class="truncate">
-                            {{ log.message[:80] if log.message else '-' }}{% if log.message and log.message|length > 80 %}…{% endif %}
-                        </td>
+                        <td><span class="badge badge-default">{{ message_types.get(log.message_type, log.message_type) }}</span></td>
+                        <td class="text-[12px]" style="color:#4B5E6D; max-width:420px;">{{ (log.message_text or '')[:160] }}</td>
                         <td class="text-center">
-                            {% if log.delivered %}
-                                <span class="badge badge-success">ส่งสำเร็จ</span>
-                            {% else %}
-                                <span class="badge badge-danger">ล้มเหลว</span>
-                            {% endif %}
+                            <span class="badge {{ 'badge-success' if log.delivered else 'badge-danger' }}">{{ 'สำเร็จ' if log.delivered else 'ไม่สำเร็จ' }}</span>
                         </td>
                     </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center py-16" style="color:#8A9BAA;">ยังไม่มีประวัติการแจ้งเตือน</td></tr>
                     {% endfor %}
-                    {% if not logs %}
-                    <tr><td colspan="5" class="text-center py-14" style="color:#8A9BAA;">ยังไม่มีประวัติการแจ้งเตือน</td></tr>
-                    {% endif %}
                 </tbody>
             </table>
         </div>
+        {% if total_pages > 1 %}
+        <div class="pager">
+            {% if page > 1 %}<a href="?message_type={{ message_type }}&page={{ page - 1 }}">← ก่อนหน้า</a>{% endif %}
+            <span class="current">{{ page }} / {{ total_pages }}</span>
+            {% if page < total_pages %}<a href="?message_type={{ message_type }}&page={{ page + 1 }}">ถัดไป →</a>{% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

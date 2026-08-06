@@ -1,222 +1,354 @@
 # ระบบติดตามการกินยาวาร์ฟาริน
-### Warfarin Medication Tracking System
+### Warfarin Medication Tracking System — v2.0
 **โรงพยาบาลสุไหงปาดี จังหวัดนราธิวาส**
 
-ระบบติดตามความต่อเนื่องในการกินยาวาร์ฟาริน พัฒนาเพื่องานวิจัย ผสานการแจ้งเตือนผ่าน LINE OA และการยืนยันการกินยาผ่าน QR Code
+ระบบติดตามความต่อเนื่องในการกินยาวาร์ฟารินสำหรับคลินิกวาร์ฟาริน
+ผสานการแจ้งเตือนผ่าน LINE Official Account, การยืนยันการกินยาด้วย QR Code,
+การติดตามค่า INR/TTR และการรายงานอาการไม่พึงประสงค์แบบสองทาง
+
+---
+
+## สารบัญ
+
+- [คุณสมบัติหลัก](#คุณสมบัติหลัก)
+- [สถาปัตยกรรม](#สถาปัตยกรรม)
+- [การติดตั้ง](#การติดตั้ง)
+- [การตั้งค่า (Environment Variables)](#การตั้งค่า-environment-variables)
+- [การ Deploy บน Render / Railway](#การ-deploy-บน-render--railway)
+- [การตั้งค่า LINE OA](#การตั้งค่า-line-oa)
+- [บทบาทผู้ใช้งาน](#บทบาทผู้ใช้งาน)
+- [คำสั่งจัดการระบบ (CLI)](#คำสั่งจัดการระบบ-cli)
+- [ความปลอดภัย](#ความปลอดภัย)
+- [การอัปเกรดจากเวอร์ชัน 1.x](#การอัปเกรดจากเวอร์ชัน-1x)
+- [การพัฒนาและทดสอบ](#การพัฒนาและทดสอบ)
+- [งานวิจัย](#งานวิจัย)
 
 ---
 
 ## คุณสมบัติหลัก
 
-- **Dashboard** — ภาพรวมรายวัน: กินแล้ว / ยังไม่กิน / พลาด / ผู้ป่วยเสี่ยง / อาการรุนแรง / LINE connected
-- **จัดการผู้ป่วย** — เพิ่ม / แก้ไข / ค้นหา / ปิดบัญชี (soft delete) / เปิดใช้งานใหม่
-- **แผนการกินยา** — สร้างแบบ bulk รองรับขนาดยาต่างกันตามวัน (จ-อา) + staff override สถานะโดส
-- **QR Code ยืนยันยา** — สร้างเป็น PNG จริง, พิมพ์เป็น QR sheet ได้, ตรวจ expires_at
-- **LINE OA Integration** — verify signature (HMAC-SHA256), webhook handler, push retry
-- **LINE Auto-linking** — ผู้ป่วยพิมพ์ `ลงทะเบียน <HN>` เพื่อเชื่อมบัญชี LINE ด้วยตัวเอง
-- **LINE Commands** — `สถานะ`, `ยา`, `adherence`, `inr`, `streak`, `อาการ`, `help`
-- **LINE Broadcast** — ส่งข้อความถึงผู้ป่วยทั้งหมดจาก dashboard
-- **Scheduled Reminders** — 18:00, 19:30 (เตือนซ้ำ), 21:00 (mark missed + แจ้งผู้ดูแล)
-- **INR Tracking + TTR** — บันทึก Lab, กราฟ Chart.js, Time in Therapeutic Range (Rosendaal)
-- **Adherence & Streak** — คำนวณ % การกินยา 7 / 30 / 365 วัน และวันติดต่อกัน (group by day)
-- **Gamification Score** — คะแนนรวม (adherence + streak bonus)
-- **Symptom Reporting** — ผู้ป่วยรายงานอาการไม่พึงประสงค์ผ่าน mobile form, auto escalate ≥4/5
-- **Pre/Post Test Score** — บันทึกผลแบบทดสอบความรู้ผู้ป่วย
-- **แบบสอบถามความพึงพอใจ** — 3 มิติ พร้อมสรุปค่าเฉลี่ยในรายงาน
-- **Notification Log** — ประวัติการแจ้งเตือน LINE ทั้งหมด + delivered flag
-- **Audit Log** — บันทึกการกระทำในระบบ (admin only)
-- **รายงาน + Export CSV** — สรุปทุกผู้ป่วย + TTR, ดาวน์โหลดเป็น CSV
+### สำหรับเจ้าหน้าที่
+| ส่วน | รายละเอียด |
+|------|-----------|
+| **แดชบอร์ด** | สรุปการกินยาวันนี้ · ผู้ป่วยที่ต้องติดตาม · INR นอกเป้าหมาย · เลยกำหนดตรวจ INR · ยาใกล้หมด · นัดหมาย 7 วัน |
+| **จัดการผู้ป่วย** | เพิ่ม/แก้ไข/ค้นหา (แบ่งหน้า) · ตรวจสอบข้อมูลก่อนบันทึกทุกช่อง · ปิด/เปิดบัญชี · ผู้ดูแล (ญาติ) พร้อมการแจ้งเตือน |
+| **แผนการกินยา** | สร้างล่วงหน้าเป็นช่วง · ขนาดยาต่างกันได้ทุกวันในสัปดาห์ · วันเว้นยา (0 mg) · คำนวณขนาดยารวมต่อสัปดาห์อัตโนมัติ |
+| **ผล INR** | บันทึกผล พร้อมแปลผลอัตโนมัติตามเป้าหมายรายบุคคล · คำแนะนำการปรับขนาดยาเชิงอ้างอิง · TTR (Rosendaal) · กราฟพร้อมแถบเป้าหมาย |
+| **นัดหมาย** | ตารางนัดทั้งคลินิก · แจ้งเตือนล่วงหน้าทาง LINE · ติดตามผู้ที่เลยกำหนดตรวจ |
+| **อาการไม่พึงประสงค์** | คัดกรองความรุนแรงอัตโนมัติ · เลขรับเรื่อง (ticket) · ตอบกลับผ่านเว็บหรือผ่าน LINE โดยตรง · สถานะ ใหม่/ตอบแล้ว/ปิดเรื่อง |
+| **รายงาน** | สรุปตัวชี้วัดทั้งคลินิก · แนวโน้มรายเดือน · ดาวน์โหลด CSV และ Excel (ระบายสีตามระดับ) |
+| **QR Code** | สร้าง QR รายโดส · พิมพ์เป็นชุด · หน้าสแกนด้วยกล้องสำหรับเจ้าหน้าที่ |
+| **ผู้ดูแลระบบ** | จัดการบัญชีผู้ใช้และบทบาท · บันทึกการใช้งาน (audit) · สถานะระบบและงานตามกำหนดเวลา |
+
+### สำหรับผู้ป่วย
+| ช่องทาง | รายละเอียด |
+|---------|-----------|
+| **LINE** | เตือนกินยา 18:00 และ 19:30 · ยืนยันด้วยลิงก์เดียว · คำสั่ง `สถานะ` `ยา` `ความสม่ำเสมอ` `ผลเลือด` `นัด` `ยาคงเหลือ` `อาการ` `ความรู้` · Rich Menu 6 ปุ่ม |
+| **หน้ายืนยันยา** | เปิดจากลิงก์หรือ QR ไม่ต้องล็อกอิน · แสดงขนาดยา สถิติ และสถิติต่อเนื่อง |
+| **พอร์ทัลส่วนตัว** (`/p/<token>`) | ดูแผนยา ผล INR ปฏิทินการกินยา และนัดหมายของตัวเอง |
+| **แจ้งอาการ** | แบบฟอร์มบนมือถือ · ตอบกลับอัตโนมัติตามความรุนแรง · เภสัชกรตอบกลับถึง LINE ได้ |
+| **คู่มือผู้ป่วย** (`/education`) | ความรู้เรื่องยา · ตารางยาที่มีปฏิกิริยา · ตารางวิตามินเคในอาหารไทย · สัญญาณอันตราย |
 
 ---
 
-## Tech Stack
+## สถาปัตยกรรม
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Python 3.11+, FastAPI |
+```
+Warfarin/
+├── app.py                     # ASGI entrypoint (uvicorn app:app)
+├── manage.py                  # CLI: migrate / status / createadmin / passwd / runjob
+├── warfarin/
+│   ├── app_factory.py         # create_app(): middleware, routers, error handlers, lifespan
+│   ├── config.py              # Settings จาก environment (ตรวจสอบตอน start)
+│   ├── db.py                  # SQLite connection (WAL, busy timeout), context managers
+│   ├── migrations.py          # Migration แบบมีเวอร์ชัน + ตาราง schema_migrations
+│   ├── security.py            # PBKDF2, session ฝั่งเซิร์ฟเวอร์, CSRF, rate limit
+│   ├── deps.py                # FastAPI dependencies: auth, roles, CSRF, rate limit
+│   ├── middleware.py          # Security headers, session, request log
+│   ├── templating.py          # Jinja environment + filters ภาษาไทย
+│   ├── audit.py               # บันทึกการใช้งาน
+│   │
+│   ├── patients.py            # โดเมน: ข้อมูลผู้ป่วยและการตรวจสอบข้อมูล
+│   ├── doses.py               # โดเมน: แผนการกินยาและการยืนยันโดส
+│   ├── appointments.py        # โดเมน: นัดหมาย ผล INR การปรับขนาดยา
+│   ├── symptoms.py            # โดเมน: รายงานอาการ ticket และการตอบกลับ
+│   ├── staff.py               # โดเมน: บัญชีผู้ใช้
+│   ├── adherence.py           # การคำนวณ: adherence, streak, TTR (มี bulk ทุกตัว)
+│   ├── clinical.py            # ความรู้ทางคลินิก: แปลผล INR, ปฏิกิริยายา, คัดกรองอาการ
+│   ├── notifications.py       # การส่งข้อความและบันทึกผลการส่ง
+│   ├── line_service.py        # LINE transport (SDK ถ้ามี, ไม่มีก็ใช้ HTTPS ตรง)
+│   ├── line_messages.py       # เนื้อหาข้อความ Flex/ข้อความ และตัวแยกคำสั่ง
+│   ├── rich_menu.py           # สร้างภาพ Rich Menu ด้วย Pillow
+│   ├── scheduler.py           # งานตามเวลา + กันงานซ้ำเมื่อมีหลาย worker
+│   └── routers/               # auth, dashboard, patients, reports, symptoms,
+│                              # admin, api, qr, public, line_bp
+├── templates/                 # Jinja2 (base สำหรับเจ้าหน้าที่ + _public_base สำหรับผู้ป่วย)
+└── tests/                     # 314 tests
+```
+
+**หลักการออกแบบ**
+
+- **แยกชั้น** — router รับ HTTP, โมดูลโดเมนถือ business logic, ทุกอย่างเทสต์ได้โดยไม่ต้องผ่าน HTTP
+- **ไม่มีคำสั่งที่พังเงียบ ๆ** — การส่ง LINE ล้มเหลวจะถูก log และบันทึกว่า `delivered=0` แต่ไม่ทำให้ผู้ป่วยยืนยันยาไม่ได้
+- **Bulk query ทุกที่ที่วนลูปผู้ป่วย** — แดชบอร์ดและรายงานไม่มี N+1
+- **Migration มีเวอร์ชัน** — อัปเกรดฐานข้อมูลเดิมได้โดยไม่สูญข้อมูล
+
+| ชั้น | เทคโนโลยี |
+|------|-----------|
+| Backend | Python 3.11+, FastAPI, Uvicorn |
 | Frontend | Jinja2, Tailwind CSS (CDN), Chart.js |
-| Database | SQLite (WAL mode) |
-| Messaging | LINE Messaging API v3 (`line-bot-sdk`) |
-| Scheduler | APScheduler (BackgroundScheduler) |
-| Deploy | Uvicorn, Procfile (Render / Railway) |
+| Database | SQLite (WAL mode) + migration แบบมีเวอร์ชัน |
+| Messaging | LINE Messaging API v3 |
+| Scheduler | APScheduler + single-flight lock ในฐานข้อมูล |
+| Export | CSV (UTF-8 BOM), Excel (openpyxl) |
 
 ---
 
 ## การติดตั้ง
 
-### 1. Clone & สร้าง Virtual Environment
-
 ```bash
 git clone https://github.com/REENX8/Warfarin.git
 cd Warfarin
+
 python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-```
-
-### 2. ติดตั้ง Dependencies
-
-```bash
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-```
 
-### 3. ตั้งค่า Environment Variables
-
-```bash
 cp .env.example .env
-```
+# แก้ไข .env — อย่างน้อยต้องตั้ง SECRET_KEY และ BASE_URL
 
-แก้ไขไฟล์ `.env`:
-
-```env
-SECRET_KEY=your-random-secret-key
-LINE_CHANNEL_SECRET=6142c0a719615fb438bfbf116869f2d3
-LINE_CHANNEL_ACCESS_TOKEN=your-token-from-line-developers
-BASE_URL=https://your-domain.com
-DB_PATH=./medtrack.db
-```
-
-### 4. รันระบบ
-
-```bash
+python manage.py migrate           # สร้าง/อัปเกรดฐานข้อมูล
 uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-เปิดเบราว์เซอร์ไปที่ `http://localhost:8000`  
-Login เริ่มต้น: **admin / admin123**
+เปิด `http://localhost:8000`
+
+**บัญชีแรก:** ถ้าไม่ได้ตั้ง `BOOTSTRAP_ADMIN_PASSWORD` ระบบจะสร้างบัญชี `admin`
+พร้อมรหัสผ่านสุ่ม และแสดงในล็อกตอนเริ่มระบบ **เพียงครั้งเดียว** จากนั้นบังคับให้เปลี่ยนรหัสผ่านเมื่อเข้าใช้ครั้งแรก
+
+```
+WARNING  Created the first admin account 'admin' with a generated password: xxxxxxxxxxxx
+```
+
+หรือสร้างเองผ่าน CLI:
+
+```bash
+python manage.py createadmin somchai --role admin --full-name "ภก.สมชาย"
+```
 
 ---
 
-## Deploy บน Render / Railway
+## การตั้งค่า (Environment Variables)
 
-1. Push โค้ดขึ้น GitHub
-2. สร้าง Web Service ชี้ที่ repo นี้
-3. ตั้ง Environment Variables ตามข้อ 3 ด้านบน
-4. Start Command จะใช้ `Procfile` อัตโนมัติ:
-   ```
-   web: uvicorn app:app --host 0.0.0.0 --port $PORT
-   ```
+ดูรายการทั้งหมดพร้อมคำอธิบายใน [`.env.example`](.env.example) — ที่สำคัญที่สุด:
 
-> **หมายเหตุ:** SQLite ไม่เหมาะกับ ephemeral filesystem — ใช้ persistent disk (Render Disk) หรือ mount volume
+| ตัวแปร | จำเป็น | คำอธิบาย |
+|--------|--------|---------|
+| `SECRET_KEY` | ✅ | ใช้เซ็น session และลิงก์ผู้ป่วย ระบบจะไม่ยอมเริ่มทำงานใน production หากไม่ตั้ง **ห้ามเปลี่ยนหลังใช้งานจริง** |
+| `BASE_URL` | ✅ | URL สาธารณะ ใช้สร้างลิงก์ LINE/QR และกำหนดว่าคุกกี้ต้องเป็น Secure หรือไม่ |
+| `DB_PATH` | ✅ | ตำแหน่งไฟล์ SQLite — **ต้องอยู่บน persistent disk** |
+| `APP_ENV` | | `production` (ค่าเริ่มต้น) / `development` / `testing` |
+| `LINE_CHANNEL_SECRET` | | เปิดใช้ webhook (รับข้อความจากผู้ป่วย) |
+| `LINE_CHANNEL_ACCESS_TOKEN` | | เปิดใช้การส่งข้อความและ Rich Menu |
+| `LINE_STAFF_REGISTER_CODE` | | รหัสให้เภสัชกรพิมพ์ใน LINE เพื่อรับแจ้งอาการและตอบกลับ |
+| `HOSPITAL_NAME`, `HOSPITAL_PHONE` | | แสดงในข้อความและหน้าผู้ป่วย |
+| `LOW_STOCK_THRESHOLD` | | แจ้งเตือนเมื่อยาเหลือน้อยกว่ากี่วัน (ค่าเริ่มต้น 7) |
 
 ---
 
-## LINE OA Setup
+## การ Deploy บน Render / Railway
 
-1. สร้าง LINE Messaging API Channel ที่ [LINE Developers Console](https://developers.line.biz/)
+1. Push โค้ดขึ้น GitHub แล้วสร้าง Web Service ชี้ที่ repo นี้
+2. **สร้าง Persistent Disk** และ mount ที่ `/var/data` จากนั้นตั้ง `DB_PATH=/var/data/medtrack.db`
+   > ⚠️ ถ้าไม่ทำขั้นนี้ ข้อมูลผู้ป่วยจะหายทุกครั้งที่ deploy ใหม่
+3. ตั้ง Environment Variables ตามตารางด้านบน
+4. `Procfile` จะทำงานอัตโนมัติ:
+   ```
+   release: python manage.py migrate
+   web: uvicorn app:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers
+   ```
+5. ตรวจสอบว่าระบบพร้อมทำงานที่ `/healthz`:
+   ```json
+   {"status":"ok","version":"2.0.0","schema_version":12,"schema_latest":12,
+    "line_push":true,"line_webhook":true,"scheduler":true}
+   ```
+
+**หมายเหตุเรื่องจำนวน worker:** SQLite ทำงานได้ดีที่สุดกับ worker เดียว
+หากจำเป็นต้องใช้หลาย worker ระบบมี single-flight lock ในตาราง `job_runs`
+ทำให้งานตามเวลา (เช่น การเตือนกินยา) รันเพียงครั้งเดียวต่อวันเสมอ
+
+**สำรองข้อมูล:** สำเนาไฟล์ `DB_PATH` (พร้อม `-wal` และ `-shm`) เป็นประจำ
+หรือใช้ `sqlite3 medtrack.db ".backup backup.db"`
+
+---
+
+## การตั้งค่า LINE OA
+
+1. สร้าง Messaging API Channel ที่ [LINE Developers Console](https://developers.line.biz/)
 2. คัดลอก **Channel Secret** และ **Channel Access Token** ใส่ `.env`
-3. ตั้ง Webhook URL: `https://your-domain.com/webhook`
-4. เปิด **Use webhook** และปิด **Auto-reply messages**
-5. ลงทะเบียน LINE User ID ของผู้ป่วยในระบบ (ช่อง "LINE User ID" ในฟอร์มผู้ป่วย)
+3. ตั้ง Webhook URL เป็น `https://your-domain.com/webhook` แล้วกด **Verify**
+4. เปิด **Use webhook** และปิด **Auto-reply messages** กับ **Greeting messages**
+5. รีสตาร์ทระบบ — Rich Menu จะถูกสร้างและตั้งเป็นค่าเริ่มต้นอัตโนมัติ
+   (ตรวจสอบสถานะได้ที่หน้า **สถานะระบบ**)
 
-### คำสั่ง LINE ที่ผู้ป่วยใช้ได้
+### คำสั่งสำหรับผู้ป่วย
 
 | พิมพ์ | ผลลัพธ์ |
 |-------|---------|
-| `ลงทะเบียน <HN>` | เชื่อมบัญชี LINE กับผู้ป่วย (auto link) |
-| `สถานะ` | สถานะยาวันนี้ + adherence 7 วัน + streak |
-| `ยา` | รายละเอียดยาวันนี้ + ลิงก์ยืนยัน |
-| `adherence` | % การกินยา 7/30 วัน + คะแนนรวม |
-| `inr` | ผล INR ล่าสุด 3 รายการ |
-| `streak` | จำนวนวันติดต่อกัน + คำชม |
-| `อาการ` | ลิงก์ฟอร์มรายงานอาการไม่พึงประสงค์ |
+| `ลงทะเบียน <HN>` | เชื่อมบัญชี LINE กับเวชระเบียนด้วยตัวเอง |
+| `สถานะ` | สถานะยาวันนี้ + ความสม่ำเสมอ 7 วัน + สถิติต่อเนื่อง |
+| `ยา` | รายละเอียดยาวันนี้ + ปุ่มยืนยัน |
+| `ความสม่ำเสมอ` | สรุป 7/30 วัน + คะแนนรวม |
+| `ผลเลือด` | ผล INR ล่าสุด 3 รายการ + TTR + นัดครั้งถัดไป |
+| `ต่อเนื่อง` | จำนวนวันกินยาติดต่อกัน |
+| `นัด` | นัดหมายที่กำลังจะถึง |
+| `ยาคงเหลือ` | จำนวนยาและประมาณการวันที่ยาหมด |
+| `อาการ` | ลิงก์แบบฟอร์มแจ้งอาการ (ลิงก์เฉพาะบุคคล) |
+| `ความรู้` | คู่มือผู้ป่วยแบบ carousel |
 | `help` | เมนูคำสั่งทั้งหมด |
 
+### การตอบอาการผ่าน LINE (เภสัชกร)
+
+1. ตั้ง `LINE_STAFF_REGISTER_CODE` เช่น `PHARM-2026`
+2. เภสัชกรเพิ่มเพื่อน LINE OA แล้วพิมพ์รหัสนั้น → ระบบลงทะเบียนให้รับแจ้งอาการ
+3. เมื่อผู้ป่วยแจ้งอาการ เภสัชกรจะได้รับข้อความพร้อม **เลขรับคำตอบ** เช่น `A01`
+4. ตอบกลับโดยพิมพ์ `A01+ข้อความถึงผู้ป่วย` — ระบบบันทึกและส่งต่อให้ผู้ป่วยทันที
+5. ยกเลิกรับแจ้งได้โดยพิมพ์ `ยกเลิกการลงทะเบียน`
+
 ---
 
-## โครงสร้างไฟล์
+## บทบาทผู้ใช้งาน
 
+| บทบาท | สิทธิ์ |
+|-------|-------|
+| `admin` ผู้ดูแลระบบ | ทุกอย่าง + จัดการบัญชีผู้ใช้ + บันทึกการใช้งาน + สถานะระบบ |
+| `pharmacist` เภสัชกร | แก้ไขข้อมูลผู้ป่วย แผนยา ผล INR นัดหมาย และตอบอาการ |
+| `nurse` พยาบาล | เหมือนเภสัชกร |
+| `staff` เจ้าหน้าที่ | ดูข้อมูลและรายงานอย่างเดียว ไม่สามารถแก้ไขได้ |
+
+ระบบป้องกันไม่ให้ปิดใช้งานหรือลดสิทธิ์ **บัญชีผู้ดูแลระบบสุดท้าย** เพื่อไม่ให้ถูกล็อกออกจากระบบทั้งหมด
+
+---
+
+## คำสั่งจัดการระบบ (CLI)
+
+```bash
+python manage.py migrate                    # อัปเกรดโครงสร้างฐานข้อมูล
+python manage.py status                     # ดูการตั้งค่าและจำนวนข้อมูล
+python manage.py createadmin <username>     # สร้างบัญชีผู้ใช้
+python manage.py passwd <username>          # ตั้งรหัสผ่านใหม่ (ยกเลิกทุก session)
+python manage.py jobs                       # ดูรายชื่องานตามเวลา
+python manage.py runjob first_reminder      # รันงานทันที (ใช้ตอนทดสอบ)
 ```
-Warfarin/
-├── app.py                    # FastAPI backend (routes, DB, scheduler)
-├── requirements.txt
-├── Procfile
-├── .env.example
-└── templates/
-    ├── base.html             # Layout หลัก (sidebar, navbar)
-    ├── login.html
-    ├── dashboard.html
-    ├── patients.html         # รายชื่อผู้ป่วย
-    ├── patient_form.html     # เพิ่ม/แก้ไขผู้ป่วย
-    ├── patient_detail.html   # ข้อมูลผู้ป่วย, doses, INR chart
-    ├── dose_confirm.html     # หน้ายืนยันยา (mobile-first, ไม่ต้อง login)
-    ├── dose_result.html      # ผลการยืนยัน
-    ├── reports.html          # รายงาน + survey summary
-    └── survey_form.html      # แบบสอบถามความพึงพอใจ
+
+---
+
+## ความปลอดภัย
+
+- **รหัสผ่าน** เข้ารหัสด้วย PBKDF2-HMAC-SHA256 (260,000 รอบ พร้อม salt)
+  รูปแบบเดียวกับ Werkzeug — รหัสผ่านแบบเดิม (SHA-256 ไม่มี salt) ยังใช้เข้าระบบได้
+  และจะถูกอัปเกรดอัตโนมัติเมื่อ login ครั้งถัดไป
+- **Session** เก็บฝั่งเซิร์ฟเวอร์ในฐานข้อมูล — ยกเลิกได้ทันที ไม่หายเมื่อรีสตาร์ท
+  และทำงานได้แม้มีหลาย worker คุกกี้เป็น `HttpOnly` + `SameSite=Lax` (+ `Secure` เมื่อใช้ HTTPS)
+- **CSRF** ป้องกันทุกคำขอที่เปลี่ยนแปลงข้อมูล ทั้งฟอร์มของเจ้าหน้าที่และของผู้ป่วย
+  (ยกเว้น `/webhook` ซึ่งตรวจสอบด้วยลายเซ็น HMAC ของ LINE แทน)
+- **ลิงก์ผู้ป่วย** ใช้โทเคนสุ่ม 24 ไบต์ ไม่ใช่หมายเลขผู้ป่วย — ไล่เดาข้อมูลไม่ได้
+- **API ข้อมูลผู้ป่วย** ต้องล็อกอินทั้งหมด (ในเวอร์ชัน 1.x เปิดสาธารณะ)
+- **จำกัดอัตราการเรียก** ทั้งหน้าล็อกอิน (ล็อก 15 นาทีหลังผิด 5 ครั้ง) หน้ายืนยันยา
+  หน้าแจ้งอาการ และผู้ใช้ LINE รายบุคคล
+- **Security headers** — CSP, `X-Frame-Options: DENY`, `nosniff`, HSTS (เมื่อใช้ HTTPS)
+- **CORS ปิดโดยค่าเริ่มต้น** (เวอร์ชัน 1.x เปิด `*` พร้อม credentials)
+- **Audit log** บันทึกทุกการเข้าระบบ การแก้ไขข้อมูลผู้ป่วย ยา ผล INR และการตอบอาการ
+
+> **ข้อมูลผู้ป่วยเป็นข้อมูลอ่อนไหว** — ต้องใช้งานผ่าน HTTPS เท่านั้น
+> จำกัดการเข้าถึงเครือข่ายตามนโยบายของโรงพยาบาล และสำรองฐานข้อมูลอย่างสม่ำเสมอ
+
+---
+
+## การอัปเกรดจากเวอร์ชัน 1.x
+
+ฐานข้อมูลเดิมใช้งานต่อได้ ไม่ต้องย้ายข้อมูล
+
+```bash
+git pull
+pip install -r requirements.txt
+python manage.py migrate      # เพิ่มตาราง/คอลัมน์ใหม่ ข้อมูลเดิมอยู่ครบ
 ```
 
----
+สิ่งที่เปลี่ยนและควรทราบ:
 
-## ตารางฐานข้อมูล
+| เรื่อง | เวอร์ชัน 1.x | เวอร์ชัน 2.0 |
+|--------|-------------|-------------|
+| บัญชีเริ่มต้น | `admin` / `admin123` ฝังในโค้ด | สร้างครั้งเดียวด้วยรหัสผ่านสุ่ม หรือจาก `BOOTSTRAP_ADMIN_PASSWORD` |
+| `SECRET_KEY` | มีค่าเริ่มต้นในโค้ด | **จำเป็นต้องตั้ง** ใน production |
+| ลิงก์แจ้งอาการ | `/report/symptom/<patient_id>` (เดาได้) | `/report/symptom/<token>` (สุ่ม) |
+| API กราฟ | เปิดสาธารณะ | ต้องล็อกอิน |
+| Session | เก็บในหน่วยความจำ (หายเมื่อรีสตาร์ท) | เก็บในฐานข้อมูล |
+| Export | CSV | CSV + Excel |
 
-| ตาราง | คำอธิบาย |
-|-------|---------|
-| `staff` | ผู้ใช้งานระบบ (เภสัชกร, พยาบาล) |
-| `patients` | ข้อมูลผู้ป่วย |
-| `caregivers` | ข้อมูลผู้ดูแล + LINE ID |
-| `medication_plan` | แผนและสถานะการกินยารายวัน |
-| `dose_tokens` | QR token + reminder_count |
-| `lab_results` | ผล INR Lab |
-| `test_scores` | คะแนน pre/post test |
-| `satisfaction_surveys` | แบบสอบถามความพึงพอใจ |
-| `symptom_reports` | รายงานอาการไม่พึงประสงค์ |
-| `notification_log` | Log การส่ง LINE |
-| `audit_log` | บันทึกการกระทำในระบบ |
+> รหัสผ่านเดิมของเจ้าหน้าที่ยังใช้ได้ตามปกติ และจะถูกอัปเกรดเป็น PBKDF2 อัตโนมัติเมื่อล็อกอินครั้งแรก
+> เนื่องจากการตรวจสอบรหัสผ่านเดิมผูกกับ `SECRET_KEY` **ต้องใช้ค่า `SECRET_KEY` เดิม** ตอนอัปเกรด
+> มิฉะนั้นต้องรีเซ็ตรหัสผ่านทุกบัญชีด้วย `python manage.py passwd <username>`
 
 ---
 
-## Scheduler Jobs (Asia/Bangkok)
+## การพัฒนาและทดสอบ
 
-| เวลา | งาน |
-|------|-----|
-| 18:00 | ส่ง LINE เตือนกินยาครั้งที่ 1 |
-| 19:30 | ส่ง LINE เตือนซ้ำครั้งที่ 2 (เฉพาะที่ยังไม่ยืนยัน) |
-| 21:00 | Mark missed + แจ้งผู้ป่วยและผู้ดูแล |
-| 03:00 | ลบ session เก่า > 24 ชม. |
+```bash
+pytest                                        # 314 tests
+pytest --cov=warfarin --cov-report=term       # พร้อมรายงาน coverage
+ruff check .                                  # ตรวจสอบสไตล์โค้ด
+ruff check --fix .
+```
 
----
+CI (GitHub Actions) รัน lint → migration smoke test → pytest (coverage ≥ 75%) → boot check ทุก push และ pull request
 
-## API Endpoints
+**โครงสร้างเทสต์**
 
-| Method | Path | คำอธิบาย |
-|--------|------|---------|
-| GET | `/dashboard` | แดชบอร์ด |
-| GET/POST | `/patients` | รายชื่อผู้ป่วย |
-| GET/POST | `/patients/new` | เพิ่มผู้ป่วย |
-| GET | `/patients/{pid}` | ข้อมูลผู้ป่วย |
-| GET/POST | `/patients/{pid}/edit` | แก้ไขผู้ป่วย |
-| POST | `/patients/{pid}/doses` | สร้างแผนยา |
-| POST | `/patients/{pid}/lab` | บันทึก INR |
-| POST | `/patients/{pid}/test-score` | บันทึกคะแนน |
-| GET/POST | `/patients/{pid}/survey` | แบบสอบถาม |
-| GET | `/dose/{token_id}` | หน้ายืนยันยา (ผู้ป่วย) |
-| POST | `/dose/{token_id}/confirm` | ยืนยันการกินยา |
-| POST | `/doses/{dose_id}/override` | Staff เปลี่ยนสถานะโดสด้วยมือ |
-| GET | `/qr/{token_id}.png` | QR code PNG ของ token |
-| GET | `/patients/{pid}/qr-sheet` | หน้า QR code รวม (print) |
-| GET/POST | `/report/symptom/{pid}` | รายงานอาการ (ไม่ต้อง login) |
-| GET | `/symptoms` | รายการรายงานอาการ (staff) |
-| GET | `/notifications` | ประวัติ LINE (staff) |
-| GET | `/audit` | Audit log (admin only) |
-| POST | `/line/broadcast` | ส่งข้อความ LINE ถึงทุกคน |
-| POST | `/patients/{pid}/delete` | ปิดบัญชีผู้ป่วย (soft delete) |
-| POST | `/patients/{pid}/reactivate` | เปิดใช้งานใหม่ |
-| GET | `/reports` | รายงาน |
-| GET | `/reports/export` | Export CSV |
-| POST | `/webhook` | LINE Webhook |
-| GET | `/api/patients/{pid}/inr-data` | JSON INR สำหรับกราฟ |
-| GET | `/api/patients/{pid}/adherence-data` | JSON adherence 30 วัน |
+| ไฟล์ | ครอบคลุม |
+|------|---------|
+| `test_auth.py` | เข้าสู่ระบบ, session, การแฮชรหัสผ่าน, การล็อกหลังพยายามผิด |
+| `test_security.py` | CSRF, security headers, rate limit, สิทธิ์ตามบทบาท, การป้องกัน redirect ออกนอกเว็บ |
+| `test_patients.py` / `test_patient_actions.py` | CRUD, การตรวจสอบข้อมูล, แผนยา, นัดหมาย, แบบสอบถาม |
+| `test_doses.py` | สร้างแผนยา, ยืนยันโดส (กันยืนยันซ้ำ), โทเคนหมดอายุ, staff override |
+| `test_adherence.py` | การนับ adherence, streak, TTR (Rosendaal), การจัดกลุ่มผู้ป่วยเสี่ยง |
+| `test_clinical.py` | การแปลผล INR, คำแนะนำปรับขนาดยา, การคัดกรองปฏิกิริยายา, การคัดกรองอาการ |
+| `test_line.py` / `test_webhook_events.py` / `test_line_replies.py` | ลายเซ็น webhook, คำสั่งผู้ป่วย, ticket ของเภสัชกร, เนื้อหาข้อความ |
+| `test_symptoms.py` | การแจ้งอาการ, ticket, การตอบกลับ, การปิดเรื่อง |
+| `test_appointments.py` | นัดหมาย, ผล INR, ประวัติการปรับขนาดยา |
+| `test_notifications.py` | เนื้อหาข้อความและการบันทึกผลการส่ง |
+| `test_reports.py` | หน้ารายงาน, CSV/Excel export, หน้าพิมพ์ |
+| `test_scheduler.py` | งานตามเวลาและ single-flight lock |
+| `test_migrations.py` | Migration ซ้ำได้, อัปเกรดฐานข้อมูลเวอร์ชัน 1.x โดยไม่สูญข้อมูล |
+| `test_portal.py` / `test_api_admin.py` | พอร์ทัลผู้ป่วย, หน้าคู่มือ, JSON API, หน้าผู้ดูแลระบบ |
 
 ---
 
 ## งานวิจัย
 
-ระบบนี้พัฒนาเพื่อรองรับงานวิจัยการเพิ่มความต่อเนื่องในการกินยาวาร์ฟารินในผู้ป่วยโรคหัวใจและหลอดเลือด โรงพยาบาลสุไหงปาดี จังหวัดนราธิวาส โดยใช้เทคโนโลยี LINE OA เป็นช่องทางการสื่อสารและติดตาม
+ระบบนี้พัฒนาเพื่อรองรับงานวิจัยการเพิ่มความต่อเนื่องในการกินยาวาร์ฟาริน
+ในผู้ป่วยโรคหัวใจและหลอดเลือด โรงพยาบาลสุไหงปาดี จังหวัดนราธิวาส
+โดยใช้ LINE OA เป็นช่องทางการสื่อสารและติดตาม
 
-**ตัวชี้วัดหลัก:**
-- Medication Adherence Rate (%)
-- Time in Therapeutic Range — TTR (%)
-- Streak (วันกินยาติดต่อกัน)
-- ความพึงพอใจของผู้ป่วยต่อระบบ (1-5 ดาว)
+**ตัวชี้วัด (ดาวน์โหลดได้จากหน้ารายงาน)**
+
+- Medication Adherence Rate (%) — 7 วัน และ 30 วัน
+- Time in Therapeutic Range — TTR (%) ด้วยวิธี Rosendaal
+- สัดส่วนผล INR ล่าสุดที่อยู่ในช่วงเป้าหมาย
+- จำนวนวันกินยาต่อเนื่อง (streak)
+- คะแนนความรู้ก่อน/หลังการให้ความรู้
+- ความพึงพอใจต่อระบบ 3 มิติ (1–5)
+
+---
+
+## ข้อจำกัดทางคลินิก
+
+คำแนะนำการปรับขนาดยาและการแปลผล INR ในระบบเป็น **ข้อมูลอ้างอิงเพื่อประกอบการตัดสินใจเท่านั้น**
+อ้างอิงแนวทาง ACCP (CHEST) และแนวปฏิบัติคลินิกวาร์ฟารินของไทย
+ระบบไม่ปรับขนาดยาเองโดยอัตโนมัติ — การตัดสินใจทั้งหมดต้องทำโดยแพทย์หรือเภสัชกรผู้รับผิดชอบ
+
+---
+
+## License
+
+MIT — ดู [LICENSE](LICENSE)

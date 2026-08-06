@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}สแกน QR{% endblock %}
+{% block content %}
+<div class="space-y-5" style="max-width:560px;">
+    <div>
+        <h1 class="text-[22px] font-bold tracking-tight">สแกน QR ยืนยันการกินยา</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">ใช้กล้องสแกน QR จากใบยาของผู้ป่วย ระบบจะพาไปยังหน้ายืนยันโดยตรง</p>
+    </div>
+
+    <div class="card p-5 space-y-3">
+        <div id="scannerBox" style="position:relative; background:#0B1F36; border-radius:12px; overflow:hidden; aspect-ratio:4/3;">
+            <video id="preview" playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+            <div style="position:absolute; inset:18%; border:3px solid rgba(255,255,255,.6); border-radius:12px; pointer-events:none;"></div>
+        </div>
+        <div id="scanStatus" class="text-[13px]" style="color:#8A9BAA;">กดปุ่มด้านล่างเพื่อเปิดกล้อง</div>
+        <div class="flex gap-2">
+            <button id="startBtn" class="btn btn-primary">เปิดกล้อง</button>
+            <button id="stopBtn" class="btn btn-secondary" disabled>ปิดกล้อง</button>
+        </div>
+    </div>
+
+    <div class="card p-5">
+        <div class="text-sm font-semibold mb-2">กรอกรหัสด้วยตนเอง</div>
+        <p class="text-[12px] mb-3" style="color:#8A9BAA;">หากสแกนไม่ได้ ให้พิมพ์รหัสใต้ QR หรือวางลิงก์ทั้งอัน</p>
+        <form onsubmit="event.preventDefault(); goToToken(document.getElementById('manualToken').value);" class="flex gap-2">
+            <input class="input" id="manualToken" placeholder="รหัสยืนยัน หรือ ลิงก์">
+            <button type="submit" class="btn btn-secondary">ไปต่อ</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let stream = null, detector = null, scanning = false;
+const status = document.getElementById('scanStatus');
+const video = document.getElementById('preview');
+
+function goToToken(raw) {
+    const value = (raw || '').trim();
+    if (!value) return;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+        try {
+            const url = new URL(value);
+            if (url.origin === window.location.origin) { window.location.href = url.pathname; return; }
+        } catch (error) { /* fall through to token handling */ }
+    }
+    const token = value.split('/').filter(Boolean).pop();
+    window.location.href = '/dose/' + encodeURIComponent(token);
+}
+
+document.getElementById('startBtn').addEventListener('click', async () => {
+    if (!('BarcodeDetector' in window)) {
+        status.textContent = 'เบราว์เซอร์นี้ไม่รองรับการสแกนในหน้าเว็บ — กรุณาใช้ Chrome บน Android หรือกรอกรหัสด้วยตนเอง';
+        return;
+    }
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
+        await video.play();
+        detector = new BarcodeDetector({ formats: ['qr_code'] });
+        scanning = true;
+        status.textContent = 'กำลังสแกน… เล็ง QR ให้อยู่ในกรอบ';
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+        tick();
+    } catch (error) {
+        status.textContent = 'ไม่สามารถเปิดกล้องได้: ' + error.message;
+    }
+});
+
+document.getElementById('stopBtn').addEventListener('click', stopScan);
+
+function stopScan() {
+    scanning = false;
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    status.textContent = 'ปิดกล้องแล้ว';
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+}
+
+async function tick() {
+    if (!scanning) return;
+    try {
+        const codes = await detector.detect(video);
+        if (codes.length) {
+            stopScan();
+            status.textContent = 'พบ QR แล้ว กำลังเปิดหน้ายืนยัน…';
+            goToToken(codes[0].rawValue);
+            return;
+        }
+    } catch (error) { /* keep scanning */ }
+    requestAnimationFrame(tick);
+}
+
+window.addEventListener('beforeunload', stopScan);
+</script>
+{% endblock %}

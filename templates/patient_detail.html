@@ -1,129 +1,192 @@
 {% extends "base.html" %}
 {% block title %}{{ patient.full_name }}{% endblock %}
 {% block content %}
+{% set can_edit = user.role in ('admin', 'pharmacist', 'nurse') %}
 <div class="space-y-5">
 
-    <!-- Back -->
-    <a href="/patients" class="text-[13px] font-medium inline-flex items-center gap-1" style="color:#0284C7;">← กลับรายชื่อ</a>
+    <a href="/patients" class="text-[13px] font-medium inline-flex items-center gap-1 no-print" style="color:#0284C7;">← กลับรายชื่อผู้ป่วย</a>
 
-    <!-- Patient header -->
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div class="flex items-center gap-4">
             <div class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0" style="background:#0284C7;">
-                {{ patient.full_name[3:5] if patient.full_name|length > 3 else patient.full_name[:2] }}
+                {{ patient.full_name[:1] }}
             </div>
             <div>
                 <div class="flex items-center gap-2 flex-wrap mb-1">
-                    <h1 class="text-[21px] font-bold tracking-tight" style="color:#0F1923;">{{ patient.full_name }}</h1>
+                    <h1 class="text-[21px] font-bold tracking-tight">{{ patient.full_name }}</h1>
                     {% if patient.line_user_id %}<span class="badge badge-primary">LINE ✓</span>{% endif %}
                     {% if not patient.active %}<span class="badge badge-default">ปิดบัญชี</span>{% endif %}
                 </div>
-                <p class="text-[13px]" style="color:#8A9BAA;">HN: {{ patient.hn or '-' }} · อายุ {{ patient.age_years or '-' }} ปี · น้ำหนัก {{ patient.weight_kg or '-' }} kg · {{ patient.diagnosis or '-' }}</p>
+                <p class="text-[13px]" style="color:#8A9BAA;">
+                    HN {{ patient.hn or '-' }} · {{ sex_labels.get(patient.sex or '', '-') }} ·
+                    อายุ {{ patient.age_years or '-' }} ปี · {{ patient.weight_kg or '-' }} กก. ·
+                    {{ indications.get(patient.indication, {}).get('label') or patient.diagnosis or 'ไม่ระบุข้อบ่งใช้' }}
+                </p>
             </div>
         </div>
-        <div class="flex flex-wrap gap-2">
-            <a href="/patients/{{ patient.patient_id }}/qr-sheet" class="btn btn-secondary btn-sm">📱 QR Sheet</a>
+        <div class="flex flex-wrap gap-2 no-print">
+            <a href="/patients/{{ patient.patient_id }}/schedule" class="btn btn-secondary btn-sm">🖨️ ตารางยา</a>
+            <a href="/patients/{{ patient.patient_id }}/qr-sheet" class="btn btn-secondary btn-sm">📱 QR ยืนยันยา</a>
             <a href="/patients/{{ patient.patient_id }}/survey" class="btn btn-secondary btn-sm">📋 แบบสอบถาม</a>
+            {% if can_edit %}
             <a href="/patients/{{ patient.patient_id }}/edit" class="btn btn-secondary btn-sm">✏️ แก้ไข</a>
             {% if patient.active %}
-            <form method="POST" action="/patients/{{ patient.patient_id }}/delete" onsubmit="return confirm('ยืนยันการปิดบัญชี?');">
-                <button type="submit" class="btn btn-sm" style="background:#FEF2F2; color:#991B1B; border:1px solid #FECACA;">🗄️ ปิดบัญชี</button>
+            <form method="POST" action="/patients/{{ patient.patient_id }}/deactivate" onsubmit="return confirm('ยืนยันการปิดบัญชีผู้ป่วยรายนี้? การแจ้งเตือนทั้งหมดจะหยุดลง');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-sm" style="background:#FEF2F2; color:#991B1B; border:1px solid #FECACA;">ปิดบัญชี</button>
             </form>
             {% else %}
             <form method="POST" action="/patients/{{ patient.patient_id }}/reactivate">
-                <button type="submit" class="btn btn-sm" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0;">♻️ เปิดใช้งาน</button>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-sm" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0;">เปิดใช้งานใหม่</button>
             </form>
+            {% endif %}
             {% endif %}
         </div>
     </div>
 
-    <!-- Patient info -->
-    <div class="card" style="padding:18px 22px;">
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[13px]">
-            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">วินิจฉัย</div><div class="font-semibold" style="color:#0F1923;">{{ patient.diagnosis or '-' }}</div></div>
-            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">โรคประจำตัว</div><div class="font-semibold" style="color:#0F1923;">{{ patient.chronic_conditions or '-' }}</div></div>
-            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">INR เป้าหมาย</div><div class="font-semibold" style="color:#0F1923;">{{ patient.target_inr_min }}–{{ patient.target_inr_max }}</div></div>
-            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">LINE</div><div class="font-semibold" style="color:{% if patient.line_user_id %}#059669{% else %}#8A9BAA{% endif %};">{{ 'เชื่อมต่อแล้ว' if patient.line_user_id else 'ยังไม่เชื่อมต่อ' }}</div></div>
+    {% if assessment and assessment.urgency >= 1 %}
+    <div class="flash flash-{{ 'danger' if assessment.urgency >= 2 else 'warning' }}">
+        <div>
+            <strong>INR ล่าสุด {{ latest_lab.value }} — {{ assessment.label }}</strong> ({{ latest_lab.test_date | thai_date }})<br>
+            <span class="text-xs">{{ assessment.advice }}</span>
         </div>
-        {% if caregivers %}
+    </div>
+    {% endif %}
+
+    {% if interaction_hits %}
+    <div class="flash flash-warning">
+        <div>
+            <strong>พบยา/สารที่อาจมีปฏิกิริยากับวาร์ฟาริน {{ interaction_hits|length }} รายการ</strong>
+            <ul class="mt-1 ml-4 list-disc text-xs">
+                {% for hit in interaction_hits %}
+                <li>{{ hit.name }} — {{ 'เพิ่ม' if hit.effect == 'increase' else 'ลด' }} INR · {{ hit.note }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if stock_days is not none and stock_days <= low_stock_threshold %}
+    <div class="flash flash-warning">
+        <div><strong>ยาใกล้หมด</strong> — เหลือประมาณ {{ stock_days }} วัน ({{ patient.pill_inventory }} เม็ด)</div>
+    </div>
+    {% endif %}
+
+    {% if plan_end and plan_end < today() %}
+    <div class="flash flash-danger">
+        <div><strong>แผนการกินยาสิ้นสุดแล้ว</strong> เมื่อ {{ plan_end | thai_date }} — กรุณาสร้างแผนใหม่เพื่อให้ระบบแจ้งเตือนต่อ</div>
+    </div>
+    {% endif %}
+
+    <div class="card p-5">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[13px]">
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">INR เป้าหมาย</div><div class="font-semibold">{{ patient.target_inr_min }}–{{ patient.target_inr_max }}</div></div>
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">ขนาดยาต่อสัปดาห์</div><div class="font-semibold">{{ weekly_mg or '-' }} mg</div></div>
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">นัดตรวจ INR ถัดไป</div><div class="font-semibold">{{ patient.next_inr_date | thai_date or '-' }}</div></div>
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">ยาคงเหลือ</div><div class="font-semibold">{{ patient.pill_inventory or 0 }} เม็ด{% if stock_days is not none %} (~{{ stock_days }} วัน){% endif %}</div></div>
+            {% if patient.allergies %}
+            <div class="col-span-2"><div class="text-[11px] mb-1" style="color:#8A9BAA;">แพ้ยา</div><div class="font-semibold" style="color:#B91C1C;">{{ patient.allergies }}</div></div>
+            {% endif %}
+            {% if patient.chronic_conditions %}
+            <div class="col-span-2"><div class="text-[11px] mb-1" style="color:#8A9BAA;">โรคประจำตัว / ยาอื่น</div><div class="font-semibold">{{ patient.chronic_conditions }}</div></div>
+            {% endif %}
+        </div>
+        {% if caregiver %}
         <div class="mt-3 pt-3 text-[13px]" style="border-top:1px solid #E2E8F0; color:#4B5E6D;">
-            <span style="color:#8A9BAA;">ผู้ดูแล:</span> <strong>{{ caregivers[0].name }}</strong> ({{ caregivers[0].relationship or '-' }}) โทร {{ caregivers[0].phone or '-' }}
+            <span style="color:#8A9BAA;">ผู้ดูแล:</span> <strong>{{ caregiver.name }}</strong>
+            ({{ caregiver.relationship or '-' }}) · โทร {{ caregiver.phone or '-' }}
+            {% if caregiver.line_user_id and caregiver.notify_enabled %}<span class="badge badge-primary">แจ้งเตือน LINE</span>{% endif %}
         </div>
         {% endif %}
+        <div class="mt-3 pt-3 text-[12px] flex items-center gap-2 flex-wrap no-print" style="border-top:1px solid #E2E8F0; color:#8A9BAA;">
+            <span>ลิงก์ส่วนตัวของผู้ป่วย:</span>
+            <code class="px-2 py-1 rounded" style="background:#F1F5F9; font-size:11px;">{{ portal_url }}</code>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('{{ portal_url }}'); this.textContent='คัดลอกแล้ว';">คัดลอก</button>
+            {% if patient.access_token %}
+            <a href="/qr/portal/{{ patient.access_token }}.png" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">QR</a>
+            {% endif %}
+        </div>
     </div>
 
-    <!-- Score row -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
-            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">Adherence 7 วัน</div>
-            <div class="text-[20px] font-bold {% if adh7.percent >= 80 %}text-emerald-600{% elif adh7.percent >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ adh7.percent }}%</div>
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">สม่ำเสมอ 7 วัน</div>
+            <div class="text-[20px] font-bold {{ adh7.percent | percent_class }}">{{ adh7.percent }}%</div>
+            <div class="text-[11px]" style="color:#8A9BAA;">{{ adh7.taken + adh7.late }}/{{ adh7.total }} มื้อ</div>
         </div>
         <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
-            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">Streak 🔥</div>
-            <div class="text-[20px] font-bold" style="color:#D97706;">{{ streak }} <span class="text-sm font-normal" style="color:#92400E;">วัน</span></div>
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">สม่ำเสมอ 30 วัน</div>
+            <div class="text-[20px] font-bold {{ adh30.percent | percent_class }}">{{ adh30.percent }}%</div>
+            <div class="text-[11px]" style="color:#8A9BAA;">ขาด {{ adh30.missed }} มื้อ</div>
+        </div>
+        <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">ต่อเนื่อง 🔥</div>
+            <div class="text-[20px] font-bold" style="color:#D97706;">{{ streak }} <span class="text-sm font-normal">วัน</span></div>
+        </div>
+        <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
+            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">TTR</div>
+            <div class="text-[20px] font-bold {% if ttr is not none and ttr >= 65 %}text-emerald-600{% elif ttr is not none %}text-amber-600{% else %}text-slate-400{% endif %}">{% if ttr is not none %}{{ ttr }}%{% else %}—{% endif %}</div>
+            <div class="text-[11px]" style="color:#8A9BAA;">เวลาอยู่ในเป้าหมาย</div>
         </div>
         <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
             <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">คะแนนรวม</div>
             <div class="text-[20px] font-bold" style="color:#7C3AED;">{{ gamification_score }}</div>
         </div>
-        <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
-            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">Adherence 30 วัน</div>
-            <div class="text-[20px] font-bold {% if adh30.percent >= 80 %}text-emerald-600{% elif adh30.percent >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ adh30.percent }}%</div>
-            <div class="text-[11px]" style="color:#8A9BAA;">กิน {{ adh30.taken }} / พลาด {{ adh30.missed }}</div>
-        </div>
-        <div class="bg-white rounded-[10px] border p-4 text-center" style="border-color:#E2E8F0;">
-            <div class="text-[11px] font-medium mb-1.5" style="color:#8A9BAA;">TTR</div>
-            <div class="text-[20px] font-bold {% if ttr and ttr >= 65 %}text-emerald-600{% elif ttr %}text-amber-600{% else %}text-slate-400{% endif %}">{% if ttr is not none %}{{ ttr }}%{% else %}—{% endif %}</div>
-            <div class="text-[11px]" style="color:#8A9BAA;">Time in Range</div>
-        </div>
     </div>
 
     {% include "_patient_detail_body.html" %}
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
-fetch('/api/patients/{{ patient.patient_id }}/inr-data').then(r=>r.json()).then(data => {
-    if (!data.length) return;
-    const ctx = document.getElementById('inrChart').getContext('2d');
-    const targetMin = {{ patient.target_inr_min }};
-    const targetMax = {{ patient.target_inr_max }};
-    const dotColors = data.map(d => (d.value >= targetMin && d.value <= targetMax) ? '#059669' : '#DC2626');
-    new Chart(ctx, {
+const patientId = {{ patient.patient_id }};
+
+fetch(`/api/patients/${patientId}/inr-data`).then(r => r.json()).then(payload => {
+    const points = payload.points || [];
+    const canvas = document.getElementById('inrChart');
+    if (!canvas) return;
+    if (!points.length) { document.getElementById('inrEmpty')?.classList.remove('hidden'); return; }
+    const targetMin = payload.target_min ?? 2, targetMax = payload.target_max ?? 3;
+    new Chart(canvas.getContext('2d'), {
         type: 'line',
-        data: { labels: data.map(d=>d.date), datasets: [{
-            label:'INR', data: data.map(d=>d.value),
-            borderColor:'#0284C7', backgroundColor:'rgba(2,132,199,.07)',
-            borderWidth:2.5, pointRadius:5.5, pointHoverRadius:7,
-            pointBackgroundColor:dotColors, pointBorderColor:'#fff', pointBorderWidth:1.5,
-            tension:.35, fill:true,
+        data: { labels: points.map(p => p.date), datasets: [{
+            label: 'INR', data: points.map(p => p.value),
+            borderColor: '#0284C7', backgroundColor: 'rgba(2,132,199,.07)',
+            borderWidth: 2.5, pointRadius: 5, pointHoverRadius: 7,
+            pointBackgroundColor: points.map(p => p.in_range ? '#059669' : '#DC2626'),
+            pointBorderColor: '#fff', pointBorderWidth: 1.5, tension: .3, fill: true,
         }]},
-        options: { responsive:true, maintainAspectRatio:false,
-            plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` INR: ${c.raw}`}}},
-            scales:{ x:{ grid:{display:false}, ticks:{font:{family:'Sarabun',size:11},color:'#8A9BAA'}},
-                     y:{ min:0, max:6, grid:{color:'rgba(0,0,0,.04)'}, ticks:{font:{family:'Sarabun',size:11},color:'#8A9BAA'}}}
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` INR: ${c.raw}` } } },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { family: 'Sarabun', size: 11 }, color: '#8A9BAA' } },
+                y: { min: 0, suggestedMax: Math.max(5, targetMax + 2), grid: { color: 'rgba(0,0,0,.04)' },
+                     ticks: { font: { family: 'Sarabun', size: 11 }, color: '#8A9BAA' } }
+            }
         },
-        plugins: [{ id:'targetZone', beforeDraw(chart) {
-            const {ctx, chartArea:{left,right}, scales:{y}} = chart;
-            const top = y.getPixelForValue(targetMax), bot = y.getPixelForValue(targetMin);
-            ctx.save(); ctx.fillStyle='rgba(5,150,105,.08)'; ctx.fillRect(left, top, right-left, bot-top); ctx.restore();
+        plugins: [{ id: 'targetZone', beforeDatasetsDraw(chart) {
+            const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+            const top = y.getPixelForValue(targetMax), bottom = y.getPixelForValue(targetMin);
+            ctx.save(); ctx.fillStyle = 'rgba(5,150,105,.09)';
+            ctx.fillRect(left, top, right - left, bottom - top); ctx.restore();
         }}]
     });
-});
+}).catch(() => {});
 
-fetch('/api/patients/{{ patient.patient_id }}/heatmap-data').then(r=>r.json()).then(data => {
+fetch(`/api/patients/${patientId}/heatmap-data`).then(r => r.json()).then(days => {
     const grid = document.getElementById('heatmap');
-    if (!grid || !data) return;
-    if (!data.length) { document.getElementById('heatmapEmpty').classList.remove('hidden'); return; }
-    const colorMap = { taken:'#059669', late:'#34D399', missed:'#DC2626', planned:'#CBD5E1', none:'#F1F5F9' };
-    const labelMap = { taken:'กินแล้ว', late:'กินช้า', missed:'พลาด', planned:'รอกิน', none:'ไม่มี' };
-    data.forEach(d => {
+    if (!grid || !Array.isArray(days) || !days.length) return;
+    const colors = { taken: '#059669', late: '#34D399', missed: '#DC2626', planned: '#CBD5E1', none: '#F1F5F9' };
+    const labels = { taken: 'กินแล้ว', late: 'กินช้า', missed: 'ขาดยา', planned: 'รอกิน', none: 'ไม่มีแผนยา' };
+    days.forEach(day => {
         const cell = document.createElement('div');
-        cell.style.cssText = `width:18px; height:18px; border-radius:4px; background:${colorMap[d.status]||colorMap.none};`;
-        cell.title = `${d.date} — ${labelMap[d.status]||d.status}` + (d.total ? ` (${d.taken}/${d.total})` : '');
+        cell.style.cssText = `width:100%; aspect-ratio:1; border-radius:3px; background:${colors[day.status] || colors.none};`;
+        cell.title = `${day.date} — ${labels[day.status] || day.status}` + (day.total ? ` (${day.taken}/${day.total})` : '');
         grid.appendChild(cell);
     });
 }).catch(() => {});
 </script>
-{% endblock %}
 {% endblock %}

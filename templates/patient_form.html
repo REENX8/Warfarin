@@ -1,108 +1,184 @@
 {% extends "base.html" %}
-{% block title %}{{ 'แก้ไขผู้ป่วย' if patient else 'เพิ่มผู้ป่วยใหม่' }}{% endblock %}
+{% block title %}{{ 'แก้ไขข้อมูลผู้ป่วย' if patient else 'เพิ่มผู้ป่วย' }}{% endblock %}
 {% block content %}
-<div class="max-w-3xl mx-auto space-y-6">
+{% set value = form or patient or {} %}
+<div class="space-y-5" style="max-width:960px;">
+
+    <a href="{{ '/patients/' ~ patient.patient_id if patient else '/patients' }}" class="text-[13px] font-medium inline-flex items-center gap-1" style="color:#0284C7;">← กลับ</a>
+
     <div>
-        <a href="{{ '/patients/' ~ patient.patient_id if patient else '/patients' }}" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">&larr; กลับ</a>
-        <h1 class="text-2xl font-bold text-slate-800 mt-2">{{ 'แก้ไขข้อมูลผู้ป่วย' if patient else 'เพิ่มผู้ป่วยใหม่' }}</h1>
+        <h1 class="text-[22px] font-bold tracking-tight">{{ 'แก้ไขข้อมูลผู้ป่วย' if patient else 'เพิ่มผู้ป่วยใหม่' }}</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">ข้อมูลที่มีเครื่องหมาย <span style="color:#DC2626;">*</span> จำเป็นต้องกรอก</p>
     </div>
 
-    <form method="POST" action="{{ '/patients/' ~ patient.patient_id ~ '/edit' if patient else '/patients/new' }}">
-        <!-- Patient info -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
-            <h2 class="text-base font-semibold text-slate-700 border-b border-slate-100 pb-3">ข้อมูลผู้ป่วย</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">HN</label>
-                    <input type="text" name="hn" value="{{ patient.hn if patient else '' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อ-สกุล <span class="text-rose-500">*</span></label>
-                    <input type="text" name="full_name" value="{{ patient.full_name if patient else '' }}" required class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">วันเกิด</label>
-                    <input type="date" name="birth_date" value="{{ patient.birth_date if patient else '' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">อายุ (ปี)</label>
-                    <input type="number" name="age_years" value="{{ patient.age_years if patient else '' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">น้ำหนัก (kg)</label>
-                    <input type="number" step="0.1" name="weight_kg" value="{{ patient.weight_kg if patient else '' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">เบอร์โทร</label>
-                    <input type="tel" name="phone" value="{{ patient.phone if patient else '' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">LINE User ID</label>
-                    <input type="text" name="line_user_id" value="{{ patient.line_user_id if patient else '' }}" placeholder="Uxxxxxxxxx" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">วินิจฉัย</label>
-                    <input type="text" name="diagnosis" value="{{ patient.diagnosis if patient else '' }}" placeholder="เช่น AF, DVT" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">โรคประจำตัว</label>
-                <textarea name="chronic_conditions" rows="2" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">{{ patient.chronic_conditions if patient else '' }}</textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">INR เป้าหมายต่ำสุด</label>
-                    <input type="number" step="0.1" name="target_inr_min" value="{{ patient.target_inr_min if patient else '2.0' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">INR เป้าหมายสูงสุด</label>
-                    <input type="number" step="0.1" name="target_inr_max" value="{{ patient.target_inr_max if patient else '3.0' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
-                </div>
-            </div>
-            {% if patient %}
-            <div>
-                <label class="flex items-center gap-2 text-sm">
-                    <input type="hidden" name="active" value="0">
-                    <input type="checkbox" name="active" value="1" {{ 'checked' if patient.active }} class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                    <span class="text-slate-700">Active (ยังรักษาอยู่)</span>
-                </label>
-            </div>
-            {% endif %}
-            <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-                💡 <strong>เชื่อม LINE อัตโนมัติ:</strong> ให้ผู้ป่วย add LINE OA ของ รพ. แล้วพิมพ์ "ลงทะเบียน {{ patient.hn if patient else 'HN' }}" — ระบบจะเชื่อมบัญชีให้เอง
-            </div>
+    {% if errors %}
+    <div class="flash flash-danger">
+        <div>
+            <strong>ข้อมูลไม่ถูกต้อง</strong>
+            <ul class="mt-1 ml-4 list-disc text-xs">
+                {% for field, message in errors.items() %}<li>{{ field }}: {{ message }}</li>{% endfor %}
+            </ul>
         </div>
+    </div>
+    {% endif %}
 
-        <!-- Caregiver -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5 mt-6">
-            <h2 class="text-base font-semibold text-slate-700 border-b border-slate-100 pb-3">ข้อมูลผู้ดูแล</h2>
-            {% set cg = caregivers[0] if caregivers else {} %}
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <form method="POST" action="{{ '/patients/' ~ patient.patient_id ~ '/edit' if patient else '/patients/new' }}" class="space-y-5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">ข้อมูลทั่วไป</div></div>
+            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ดูแล</label>
-                    <input type="text" name="caregiver_name" value="{{ cg.name if cg else '' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
+                    <label class="label" for="full_name">ชื่อ-นามสกุล <span style="color:#DC2626;">*</span></label>
+                    <input class="input {% if errors.full_name %}is-invalid{% endif %}" id="full_name" name="full_name" required maxlength="120" value="{{ value.full_name or '' }}">
+                    {% if errors.full_name %}<div class="field-error">{{ errors.full_name }}</div>{% endif %}
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">เบอร์โทรผู้ดูแล</label>
-                    <input type="tel" name="caregiver_phone" value="{{ cg.phone if cg else '' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
+                    <label class="label" for="hn">HN</label>
+                    <input class="input {% if errors.hn %}is-invalid{% endif %}" id="hn" name="hn" maxlength="32" value="{{ value.hn or '' }}">
+                    {% if errors.hn %}<div class="field-error">{{ errors.hn }}</div>{% endif %}
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">LINE ผู้ดูแล</label>
-                    <input type="text" name="caregiver_line" value="{{ cg.line_user_id if cg else '' }}" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
+                    <label class="label" for="sex">เพศ</label>
+                    <select class="input" id="sex" name="sex">
+                        <option value="">-</option>
+                        <option value="male" {% if value.sex == 'male' %}selected{% endif %}>ชาย</option>
+                        <option value="female" {% if value.sex == 'female' %}selected{% endif %}>หญิง</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">ความสัมพันธ์</label>
-                    <input type="text" name="caregiver_relationship" value="{{ cg.relationship if cg else '' }}" placeholder="เช่น คู่สมรส, ลูก" class="w-full rounded-lg border-slate-300 text-sm focus:ring-indigo-500 focus:border-indigo-500 border px-3 py-2.5">
+                    <label class="label" for="birth_date">วันเกิด</label>
+                    <input type="date" class="input {% if errors.birth_date %}is-invalid{% endif %}" id="birth_date" name="birth_date" value="{{ value.birth_date or '' }}">
+                    {% if errors.birth_date %}<div class="field-error">{{ errors.birth_date }}</div>{% endif %}
+                </div>
+                <div>
+                    <label class="label" for="age_years">อายุ (ปี)</label>
+                    <input type="number" min="0" max="130" class="input {% if errors.age_years %}is-invalid{% endif %}" id="age_years" name="age_years" value="{{ value.age_years or '' }}">
+                    {% if errors.age_years %}<div class="field-error">{{ errors.age_years }}</div>{% endif %}
+                </div>
+                <div>
+                    <label class="label" for="weight_kg">น้ำหนัก (กก.)</label>
+                    <input type="number" step="0.1" min="1" max="400" class="input {% if errors.weight_kg %}is-invalid{% endif %}" id="weight_kg" name="weight_kg" value="{{ value.weight_kg or '' }}">
+                    {% if errors.weight_kg %}<div class="field-error">{{ errors.weight_kg }}</div>{% endif %}
+                </div>
+                <div>
+                    <label class="label" for="phone">เบอร์โทรศัพท์</label>
+                    <input class="input {% if errors.phone %}is-invalid{% endif %}" id="phone" name="phone" value="{{ value.phone or '' }}" placeholder="08X-XXX-XXXX">
+                    {% if errors.phone %}<div class="field-error">{{ errors.phone }}</div>{% endif %}
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="label" for="line_user_id">LINE User ID</label>
+                    <input class="input {% if errors.line_user_id %}is-invalid{% endif %}" id="line_user_id" name="line_user_id" value="{{ value.line_user_id or '' }}" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                    {% if errors.line_user_id %}<div class="field-error">{{ errors.line_user_id }}</div>
+                    {% else %}<div class="text-[11px] mt-1" style="color:#8A9BAA;">เว้นว่างได้ — ผู้ป่วยเชื่อมเองได้โดยพิมพ์ "ลงทะเบียน &lt;HN&gt;" ใน LINE</div>{% endif %}
                 </div>
             </div>
         </div>
 
-        <div class="mt-6 flex gap-3">
-            <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors">
-                {{ 'บันทึกการแก้ไข' if patient else 'เพิ่มผู้ป่วย' }}
-            </button>
-            <a href="{{ '/patients/' ~ patient.patient_id if patient else '/patients' }}" class="px-6 py-2.5 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">ยกเลิก</a>
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">ข้อมูลการรักษา</div></div>
+            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                    <label class="label" for="indication">ข้อบ่งใช้วาร์ฟาริน</label>
+                    <select class="input" id="indication" name="indication" onchange="applyIndicationTarget()">
+                        <option value="">-</option>
+                        {% for key, info in indications.items() %}
+                        <option value="{{ key }}" data-min="{{ info.inr_min }}" data-max="{{ info.inr_max }}"
+                                {% if value.indication == key %}selected{% endif %}>{{ info.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="label" for="target_inr_min">INR เป้าหมาย ต่ำสุด</label>
+                    <input type="number" step="0.1" min="0.8" max="6" class="input {% if errors.target_inr_min %}is-invalid{% endif %}" id="target_inr_min" name="target_inr_min" value="{{ value.target_inr_min or 2.0 }}">
+                </div>
+                <div>
+                    <label class="label" for="target_inr_max">INR เป้าหมาย สูงสุด</label>
+                    <input type="number" step="0.1" min="0.8" max="6" class="input {% if errors.target_inr_max %}is-invalid{% endif %}" id="target_inr_max" name="target_inr_max" value="{{ value.target_inr_max or 3.0 }}">
+                    {% if errors.target_inr_max %}<div class="field-error">{{ errors.target_inr_max }}</div>{% endif %}
+                </div>
+                <div>
+                    <label class="label" for="warfarin_start_date">วันที่เริ่มยาวาร์ฟาริน</label>
+                    <input type="date" class="input" id="warfarin_start_date" name="warfarin_start_date" value="{{ value.warfarin_start_date or '' }}">
+                </div>
+                <div>
+                    <label class="label" for="next_inr_date">วันนัดตรวจ INR ครั้งถัดไป</label>
+                    <input type="date" class="input" id="next_inr_date" name="next_inr_date" value="{{ value.next_inr_date or '' }}">
+                </div>
+                <div>
+                    <label class="label" for="inr_interval_days">ระยะห่างการตรวจ INR (วัน)</label>
+                    <input type="number" min="1" max="180" class="input" id="inr_interval_days" name="inr_interval_days" value="{{ value.inr_interval_days or 28 }}">
+                </div>
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="label" for="diagnosis">การวินิจฉัย</label>
+                    <input class="input" id="diagnosis" name="diagnosis" maxlength="500" value="{{ value.diagnosis or '' }}">
+                </div>
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="label" for="chronic_conditions">โรคประจำตัว / ยาอื่นที่ใช้อยู่</label>
+                    <textarea class="input" id="chronic_conditions" name="chronic_conditions" rows="2" maxlength="500">{{ value.chronic_conditions or '' }}</textarea>
+                    <div class="text-[11px] mt-1" style="color:#8A9BAA;">ระบบจะตรวจหายาที่มีปฏิกิริยากับวาร์ฟารินจากข้อความนี้โดยอัตโนมัติ</div>
+                </div>
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="label" for="allergies">ประวัติแพ้ยา</label>
+                    <input class="input" id="allergies" name="allergies" maxlength="500" value="{{ value.allergies or '' }}">
+                </div>
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="label" for="notes">บันทึกเพิ่มเติม</label>
+                    <textarea class="input" id="notes" name="notes" rows="3" maxlength="2000">{{ value.notes or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">ผู้ดูแล (ญาติ)</div></div>
+            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                    <label class="label" for="caregiver_name">ชื่อผู้ดูแล</label>
+                    <input class="input" id="caregiver_name" name="caregiver_name" value="{{ caregiver.name if caregiver else '' }}">
+                </div>
+                <div>
+                    <label class="label" for="caregiver_relationship">ความสัมพันธ์</label>
+                    <input class="input" id="caregiver_relationship" name="caregiver_relationship" value="{{ caregiver.relationship if caregiver else '' }}">
+                </div>
+                <div>
+                    <label class="label" for="caregiver_phone">เบอร์โทรผู้ดูแล</label>
+                    <input class="input" id="caregiver_phone" name="caregiver_phone" value="{{ caregiver.phone if caregiver else '' }}">
+                </div>
+                <div>
+                    <label class="label" for="caregiver_line">LINE ผู้ดูแล</label>
+                    <input class="input" id="caregiver_line" name="caregiver_line" value="{{ caregiver.line_user_id if caregiver else '' }}">
+                </div>
+                <div class="sm:col-span-2 lg:col-span-4">
+                    <label class="flex items-center gap-2 text-[13px]">
+                        <input type="checkbox" name="caregiver_notify" {% if not caregiver or caregiver.notify_enabled %}checked{% endif %}>
+                        แจ้งเตือนผู้ดูแลทาง LINE เมื่อผู้ป่วยขาดยา
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        {% if patient %}
+        <p class="text-[12px]" style="color:#8A9BAA;">
+            การเปิด/ปิดการติดตามผู้ป่วยทำได้จากปุ่มในหน้าข้อมูลผู้ป่วย
+        </p>
+        {% endif %}
+
+        <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+            <a href="{{ '/patients/' ~ patient.patient_id if patient else '/patients' }}" class="btn btn-secondary">ยกเลิก</a>
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function applyIndicationTarget() {
+    const select = document.getElementById('indication');
+    const option = select.options[select.selectedIndex];
+    if (!option || !option.dataset.min) return;
+    document.getElementById('target_inr_min').value = option.dataset.min;
+    document.getElementById('target_inr_max').value = option.dataset.max;
+}
+</script>
 {% endblock %}

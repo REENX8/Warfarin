@@ -1,88 +1,56 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ผลการยืนยันยา | รพ.สุไหงปาดี</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-        body { font-family:'Sarabun',sans-serif; background:#F0F4F8; min-height:100vh;
-               display:flex; align-items:flex-start; justify-content:center; padding:24px 16px 48px; }
-        .shell { width:100%; max-width:420px; }
-        .card { background:#fff; border:1px solid #E2E8F0; border-radius:16px;
-                box-shadow:0 4px 16px rgba(15,27,40,.07); overflow:hidden; }
-        .hero { background:linear-gradient(160deg,#065F46,#059669); padding:36px 28px 28px; text-align:center; }
-        .check-circle { width:72px; height:72px; border-radius:50%; background:rgba(255,255,255,.2);
-                        display:flex; align-items:center; justify-content:center; margin:0 auto 18px; }
-        .hero h2 { font-size:24px; font-weight:800; color:#fff; margin-bottom:6px; }
-        .hero p  { font-size:14px; color:rgba(255,255,255,.8); line-height:1.5; }
-        .body { padding:22px; display:flex; flex-direction:column; gap:14px; }
-        .streak-card { background:#FFFBEB; border:1px solid #FDE68A; border-radius:14px; padding:18px 20px; }
-        .streak-card .label { font-size:11px; color:#92400E; font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px; }
-        .streak-row { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
-        .streak-val { font-size:36px; font-weight:800; color:#D97706; line-height:1; }
-        .streak-unit { font-size:14px; color:#92400E; }
-        .progress-track { height:8px; border-radius:4px; background:#FDE68A; overflow:hidden; margin-bottom:6px; }
-        .progress-fill  { height:100%; border-radius:4px; background:linear-gradient(90deg,#D97706,#F59E0B); }
-        .progress-meta { font-size:12px; color:#A16207; display:flex; justify-content:space-between; }
-        .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-        .stat-mini { border-radius:12px; padding:14px 16px; text-align:center; }
-        .stat-mini .s-label { font-size:11px; font-weight:600; margin-bottom:4px; }
-        .stat-mini .s-value { font-size:26px; font-weight:800; }
-        .btn-home { display:block; width:100%; padding:13px; border-radius:12px; border:none;
-                    background:#0B1F36; color:#fff; font-size:14px; font-weight:600;
-                    cursor:pointer; font-family:inherit; text-align:center; text-decoration:none; }
-    </style>
-</head>
-<body>
-<div class="shell">
-    <div class="card">
-        <div class="hero">
-            <div class="check-circle">
-                <svg width="32" height="32" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+{% extends "_public_base.html" %}
+{% block title %}ผลการยืนยันยา{% endblock %}
+{% block content %}
+
+<div class="card">
+    {% if success %}
+    <div style="background:linear-gradient(160deg,#065F46,#059669); padding:34px 26px 26px; text-align:center;">
+        <div style="width:72px; height:72px; border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+            <svg width="32" height="32" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <h2 style="font-size:24px; font-weight:800; color:#fff; margin-bottom:6px;">ยืนยันสำเร็จ!</h2>
+        <p style="font-size:14px; color:rgba(255,255,255,.85); line-height:1.5;">
+            บันทึกการกินยา {{ dose.warfarin_mg }} mg เรียบร้อยแล้ว
+            {% if status == 'late' %}<br>(บันทึกเป็น "กินช้ากว่ากำหนด"){% endif %}
+        </p>
+    </div>
+
+    <div class="card-pad">
+        <div class="notice notice-warning" style="text-align:center; margin-bottom:14px;">
+            <div style="font-size:38px; line-height:1;">🔥</div>
+            <div style="font-size:34px; font-weight:800; color:#D97706; line-height:1.2;">{{ streak }}</div>
+            <div style="font-size:13px; color:#92400E;">วันติดต่อกัน</div>
+            <div style="height:8px; border-radius:4px; background:#FDE68A; overflow:hidden; margin:12px 0 6px;">
+                <div style="height:100%; border-radius:4px; width:{{ [streak * 5, 100] | min }}%; background:linear-gradient(90deg,#D97706,#F59E0B);"></div>
             </div>
-            <h2>ยืนยันสำเร็จ!</h2>
-            <p>บันทึกการกินยาแล้ว<br>{{ confirmed_at[:16] if confirmed_at else '' }} น.</p>
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:#A16207;">
+                <span>เป้าหมาย 20 วัน</span><span>{{ [streak * 5, 100] | min }}%</span>
+            </div>
         </div>
 
-        <div class="body">
-            <!-- Streak -->
-            <div class="streak-card">
-                <div class="label">ความต่อเนื่องในการกินยา</div>
-                <div class="streak-row">
-                    <span style="font-size:40px;">🔥</span>
-                    <div>
-                        <div><span class="streak-val">{{ streak }}</span> <span class="streak-unit">วัน</span></div>
-                        <div style="font-size:12px; color:#92400E;">ติดต่อกัน!</div>
-                    </div>
-                </div>
-                <div class="progress-track">
-                    <div class="progress-fill" style="width:{{ [streak * 5, 100]|min }}%;"></div>
-                </div>
-                <div class="progress-meta">
-                    <span>เป้าหมาย 20 วัน</span>
-                    <span>{{ [streak * 5, 100]|min }}%</span>
-                </div>
-            </div>
+        {% if portal_token %}
+        <a href="/p/{{ portal_token }}" class="btn btn-dark">ดูข้อมูลสุขภาพของฉัน</a>
+        <a href="/report/symptom/{{ portal_token }}" class="btn btn-ghost" style="margin-top:8px;">แจ้งอาการผิดปกติ</a>
+        {% endif %}
+    </div>
 
-            <!-- Score + adherence -->
-            <div class="stats-grid">
-                <div class="stat-mini" style="background:#EFF8FF;">
-                    <div class="s-label" style="color:#0369A1;">คะแนนวันนี้</div>
-                    <div class="s-value" style="color:#0284C7;">+{{ points_today or 10 }}</div>
-                    <div style="font-size:11px; color:#0369A1;">รวม: {{ gamification_score }}</div>
-                </div>
-                <div class="stat-mini" style="background:#ECFDF5;">
-                    <div class="s-label" style="color:#065F46;">Adherence 30 วัน</div>
-                    <div class="s-value" style="color:#059669;">{{ adh30 }}%</div>
-                </div>
-            </div>
-
-            <a href="/" class="btn-home">กลับหน้าหลัก</a>
+    {% else %}
+    <div style="background:#FFFBEB; padding:32px 26px; text-align:center;">
+        <div style="font-size:44px; line-height:1; margin-bottom:10px;">⚠️</div>
+        <h2 style="font-size:20px; font-weight:800; color:#92400E; margin-bottom:8px;">ไม่สามารถยืนยันได้</h2>
+        <p style="font-size:14px; color:#A16207; line-height:1.6;">{{ message }}</p>
+    </div>
+    <div class="card-pad">
+        <div class="notice notice-info">
+            หากคุณกินยาไปแล้วแต่ยืนยันไม่สำเร็จ ไม่ต้องกินซ้ำนะคะ
+            กรุณาแจ้งเจ้าหน้าที่ในการติดตามครั้งถัดไป
         </div>
     </div>
+    {% endif %}
 </div>
-</body>
-</html>
+
+<div class="notice notice-warning">
+    ⚠️ หากมีเลือดออกไม่หยุด อาเจียนเป็นเลือด อุจจาระสีดำ หรือปวดศีรษะรุนแรง
+    กรุณาไปโรงพยาบาลทันที
+</div>
+{% endblock %}

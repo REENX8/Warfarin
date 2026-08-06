@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}ยังไม่ยืนยันวันนี้{% endblock %}
+{% block content %}
+<div class="space-y-5">
+    <div>
+        <h1 class="text-[22px] font-bold tracking-tight">ยังไม่ยืนยันการกินยาวันนี้</h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">{{ today() | thai_date }} · {{ rows|length }} รายการ</p>
+    </div>
+
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr><th>ผู้ป่วย</th><th>ขนาดยา</th><th>เวลา</th><th class="text-center">สถานะ</th><th class="text-center">ช่องทางติดต่อ</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>
+                            <a href="/patients/{{ row.patient_id }}" class="font-semibold hover:underline" style="color:#0284C7;">{{ row.full_name }}</a>
+                            <div class="text-[11px]" style="color:#8A9BAA;">HN {{ row.hn or '-' }}</div>
+                        </td>
+                        <td>{{ row.warfarin_mg }} mg</td>
+                        <td>{{ row.scheduled_time }} น.</td>
+                        <td class="text-center"><span class="badge {{ status_badges.get(row.status, 'badge-default') }}">{{ dose_status_labels.get(row.status, row.status) }}</span></td>
+                        <td class="text-center text-[12px]">
+                            {% if row.phone %}<a href="tel:{{ row.phone }}" style="color:#0284C7;">{{ row.phone }}</a>{% else %}—{% endif %}
+                            {% if row.line_user_id %}<div class="badge badge-primary mt-1">LINE</div>{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center py-16" style="color:#8A9BAA;">ผู้ป่วยยืนยันการกินยาครบทุกรายแล้ว 🎉</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

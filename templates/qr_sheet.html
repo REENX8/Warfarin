@@ -1,44 +1,33 @@
 {% extends "base.html" %}
-{% block title %}QR Code {{ patient.full_name }}{% endblock %}
+{% block title %}QR ยืนยันยา — {{ patient.full_name }}{% endblock %}
 {% block content %}
-<div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 no-print">
-        <div>
-            <a href="/patients/{{ patient.patient_id }}" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">&larr; กลับ</a>
-            <h1 class="text-2xl font-bold text-slate-800 mt-1">QR Code ยืนยันการกินยา</h1>
-            <p class="text-sm text-slate-500">{{ patient.full_name }} | HN: {{ patient.hn or '-' }}</p>
-        </div>
-        <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors">
-            🖨️ พิมพ์
-        </button>
+<div class="space-y-5">
+    <div class="flex justify-between items-start gap-3 no-print">
+        <a href="/patients/{{ patient.patient_id }}" class="text-[13px] font-medium" style="color:#0284C7;">← กลับข้อมูลผู้ป่วย</a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">🖨️ พิมพ์</button>
     </div>
 
-    {% if not doses %}
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">
-        ยังไม่มีโดสที่รอกินในอนาคต
-    </div>
-    {% else %}
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 print:grid-cols-3">
-        {% for d in doses %}
-        <div class="bg-white rounded-xl shadow-sm border-2 border-slate-200 p-4 text-center break-inside-avoid">
-            <p class="text-xs text-slate-400">{{ patient.hn or '-' }} • {{ patient.full_name }}</p>
-            <p class="text-base font-bold text-slate-800 mt-1">{{ d.scheduled_date }}</p>
-            <p class="text-xs text-slate-500">เวลา {{ d.scheduled_time }} น.</p>
-            <div class="my-3 flex justify-center">
-                <img src="/qr/{{ d.token_id }}.png" alt="QR" class="w-40 h-40">
+    <div class="card p-6">
+        <div class="text-center mb-5" style="border-bottom:2px solid #0B1F36; padding-bottom:12px;">
+            <div class="text-[17px] font-bold">QR ยืนยันการกินยาวาร์ฟาริน</div>
+            <div class="text-[13px] mt-1" style="color:#4B5E6D;">
+                {{ patient.full_name }} · HN {{ patient.hn or '-' }} · {{ hospital_name }}
             </div>
-            <p class="text-lg font-bold text-indigo-600">{{ d.warfarin_mg }} mg</p>
-            <p class="text-xs text-slate-400">{{ d.pill_description or 'ยาวาร์ฟาริน' }}</p>
+            <div class="text-[12px] mt-1" style="color:#8A9BAA;">สแกน QR ของวันนั้นหลังกินยา เพื่อยืนยันเข้าระบบ</div>
         </div>
-        {% endfor %}
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {% for dose in doses %}
+            <div style="border:1px solid #E2E8F0; border-radius:10px; padding:12px; text-align:center; break-inside:avoid;">
+                <div class="text-[13px] font-bold">{{ dose.scheduled_date | thai_date }}</div>
+                <div class="text-[11px] mb-2" style="color:#8A9BAA;">{{ dose.warfarin_mg }} mg · {{ dose.scheduled_time }} น.</div>
+                <img src="/qr/{{ dose.token_id }}.png" alt="QR ยืนยันยา {{ dose.scheduled_date }}"
+                     style="width:100%; max-width:150px; margin:0 auto; display:block;" loading="lazy">
+            </div>
+            {% else %}
+            <div class="col-span-full text-center py-12" style="color:#8A9BAA;">ยังไม่มีแผนการกินยาในอนาคต</div>
+            {% endfor %}
+        </div>
     </div>
-    {% endif %}
 </div>
-<style>
-@media print {
-    .no-print, aside, header { display: none !important; }
-    main, .lg\:ml-64 { margin-left: 0 !important; padding: 0 !important; }
-    body { background: white; }
-}
-</style>
 {% endblock %}

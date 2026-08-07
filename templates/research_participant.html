@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}{{ participant.full_name }} — งานวิจัย{% endblock %}
+{% block content %}
+{% set can_edit = user.role in ('admin', 'pharmacist') %}
+<div class="space-y-5">
+    <a href="/research/participants" class="text-[13px] font-medium no-print" style="color:#0284C7;">← กลับรายชื่อผู้เข้าร่วม</a>
+
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+                <h1 class="text-[21px] font-bold tracking-tight">{{ participant.full_name }}</h1>
+                <span class="badge {{ 'badge-primary' if participant.arm == 'intervention' else 'badge-default' }}">{{ arms[participant.arm] }}</span>
+                <span class="badge {% if participant.status == 'withdrawn' %}badge-danger{% elif participant.status == 'completed' %}badge-success{% else %}badge-primary{% endif %}">{{ statuses[participant.status] }}</span>
+            </div>
+            <p class="text-[13px]" style="color:#8A9BAA;">
+                รหัสผู้เข้าร่วม {{ participant.participant_id }} · HN {{ participant.hn or '-' }} · โครงการ {{ participant.study_code }}
+            </p>
+        </div>
+        <div class="flex gap-2 no-print">
+            <a href="/patients/{{ participant.patient_id }}" class="btn btn-secondary btn-sm">ข้อมูลทางคลินิก</a>
+            {% if can_edit %}
+            <a href="/research/enroll/{{ participant.patient_id }}" class="btn btn-secondary btn-sm">แก้ไขข้อมูลวิจัย</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if participant.status == 'withdrawn' %}
+    <div class="flash flash-danger">
+        <div>ถอนตัวเมื่อ {{ participant.withdrawn_at | datetime_str }} — เหตุผล: {{ participant.withdrawal_reason }}</div>
+    </div>
+    {% endif %}
+
+    <div class="card p-5">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[13px]">
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">ยินยอมเมื่อ</div><div class="font-semibold">{{ participant.consent_date | thai_date or '-' }}</div></div>
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">เวอร์ชันเอกสาร</div><div class="font-semibold">{{ participant.consent_version or '-' }}</div></div>
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">ช่วง Baseline</div><div class="font-semibold">{{ participant.baseline_start | thai_date }} – {{ participant.baseline_end | thai_date }}</div></div>
+            <div><div class="text-[11px] mb-1" style="color:#8A9BAA;">ช่วง Endline</div><div class="font-semibold">{{ participant.endline_start | thai_date }} – {{ participant.endline_end | thai_date }}</div></div>
+        </div>
+    </div>
+
+    <!-- Outcomes computed from clinical data -->
+    <div class="card overflow-hidden">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold">ผลลัพธ์ที่คำนวณจากข้อมูลจริง</div>
+                <div class="text-xs" style="color:#8A9BAA;">คำนวณอัตโนมัติจากบันทึกการกินยาและผล INR ในแต่ละช่วง</div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead><tr><th>ตัวชี้วัด</th><th class="text-center">Baseline</th><th class="text-center">Endline</th><th class="text-center">ผลต่าง</th></tr></thead>
+                <tbody>
+                    {% macro delta(after, before, unit='%') -%}
+                        {%- if after is not none and before is not none -%}
+                            {%- set diff = after - before -%}
+                            <span class="font-bold" style="color:{{ '#059669' if diff > 0 else ('#DC2626' if diff < 0 else '#64748B') }};">
+                                {{ '+' if diff > 0 else '' }}{{ '%.1f'|format(diff) }}{{ unit }}
+                            </span>
+                        {%- else -%}<span style="color:#CBD5E1;">—</span>{%- endif -%}
+                    {%- endmacro %}
+
+                    <tr>
+                        <td class="font-semibold">ความสม่ำเสมอในการกินยา</td>
+                        <td class="text-center">{% if baseline.adherence_percent is not none %}{{ baseline.adherence_percent }}%<div class="text-[11px]" style="color:#8A9BAA;">{{ baseline.doses_taken }}/{{ baseline.doses_total }} มื้อ</div>{% else %}<span style="color:#CBD5E1;">ไม่มีข้อมูล</span>{% endif %}</td>
+                        <td class="text-center">{% if endline.adherence_percent is not none %}{{ endline.adherence_percent }}%<div class="text-[11px]" style="color:#8A9BAA;">{{ endline.doses_taken }}/{{ endline.doses_total }} มื้อ</div>{% else %}<span style="color:#CBD5E1;">ไม่มีข้อมูล</span>{% endif %}</td>
+                        <td class="text-center">{{ delta(endline.adherence_percent, baseline.adherence_percent) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold">Time in Therapeutic Range</td>
+                        <td class="text-center">{% if baseline.ttr_percent is not none %}{{ baseline.ttr_percent }}%{% else %}<span style="color:#CBD5E1;">ต้องมีผล INR ≥ 2 ครั้ง</span>{% endif %}</td>
+                        <td class="text-center">{% if endline.ttr_percent is not none %}{{ endline.ttr_percent }}%{% else %}<span style="color:#CBD5E1;">ต้องมีผล INR ≥ 2 ครั้ง</span>{% endif %}</td>
+                        <td class="text-center">{{ delta(endline.ttr_percent, baseline.ttr_percent) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold">สัดส่วนผล INR ในเป้าหมาย</td>
+                        <td class="text-center">{% if baseline.inr_in_range_percent is not none %}{{ baseline.inr_in_range_percent }}%<div class="text-[11px]" style="color:#8A9BAA;">{{ baseline.inr_in_range }}/{{ baseline.inr_tests }} ครั้ง</div>{% else %}<span style="color:#CBD5E1;">—</span>{% endif %}</td>
+                        <td class="text-center">{% if endline.inr_in_range_percent is not none %}{{ endline.inr_in_range_percent }}%<div class="text-[11px]" style="color:#8A9BAA;">{{ endline.inr_in_range }}/{{ endline.inr_tests }} ครั้ง</div>{% else %}<span style="color:#CBD5E1;">—</span>{% endif %}</td>
+                        <td class="text-center">{{ delta(endline.inr_in_range_percent, baseline.inr_in_range_percent) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold">ค่าเฉลี่ย INR</td>
+                        <td class="text-center">{{ baseline.mean_inr if baseline.mean_inr is not none else '—' }}</td>
+                        <td class="text-center">{{ endline.mean_inr if endline.mean_inr is not none else '—' }}</td>
+                        <td class="text-center">{{ delta(endline.mean_inr, baseline.mean_inr, '') }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Instruments -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold">แบบวัดที่ต้องเก็บด้วยตนเอง</div>
+                <div class="text-xs" style="color:#8A9BAA;">บันทึกซ้ำได้ ระบบจะแทนที่ค่าเดิมของช่วงนั้น</div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr><th>แบบวัด</th>{% for key, label in phases.items() %}<th class="text-center">{{ label }}</th>{% endfor %}<th class="text-center">ผลต่าง</th></tr>
+                </thead>
+                <tbody>
+                    {% for key, info in instruments.items() %}
+                    {% set recorded = measurements.get(key, {}) %}
+                    <tr>
+                        <td class="font-semibold">{{ info.label }}<div class="text-[11px]" style="color:#8A9BAA;">เต็ม {{ info.max }} คะแนน</div></td>
+                        {% for phase in phases %}
+                        <td class="text-center">
+                            {% if recorded.get(phase) %}
+                            <span class="font-bold">{{ recorded[phase].value }}</span>
+                            <div class="text-[11px]" style="color:#8A9BAA;">{{ recorded[phase].measured_on | thai_date }}</div>
+                            {% else %}<span class="badge badge-default">ยังไม่บันทึก</span>{% endif %}
+                        </td>
+                        {% endfor %}
+                        <td class="text-center">
+                            {% if recorded.get('baseline') and recorded.get('endline') %}
+                            {% set diff = recorded['endline'].value - recorded['baseline'].value %}
+                            <span class="font-bold" style="color:{{ '#059669' if diff > 0 else ('#DC2626' if diff < 0 else '#64748B') }};">
+                                {{ '+' if diff > 0 else '' }}{{ '%.1f'|format(diff) }}
+                            </span>
+                            {% else %}<span style="color:#CBD5E1;">—</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if can_edit %}
+        <div class="p-5" style="border-top:1px solid #E2E8F0;">
+            <form method="POST" action="/research/participants/{{ participant.participant_id }}/measurement"
+                  class="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="sm:col-span-2">
+                    <label class="label" for="instrument">แบบวัด</label>
+                    <select class="input" id="instrument" name="instrument" required>
+                        {% for key, info in instruments.items() %}
+                        <option value="{{ key }}">{{ info.label }} (เต็ม {{ info.max }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="label" for="phase">ช่วง</label>
+                    <select class="input" id="phase" name="phase" required>
+                        {% for key, label in phases.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="label" for="value">คะแนน</label>
+                    <input class="input" id="value" name="value" type="number" step="0.5" min="0" required>
+                </div>
+                <div>
+                    <label class="label" for="measured_on">วันที่วัด</label>
+                    <input class="input" id="measured_on" name="measured_on" type="date" value="{{ today }}" max="{{ today }}">
+                </div>
+                <div class="sm:col-span-5">
+                    <button type="submit" class="btn btn-primary">บันทึกคะแนน</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if can_edit %}
+    <div class="card">
+        <div class="card-header"><div class="text-sm font-semibold">สถานะการเข้าร่วม</div></div>
+        <div class="p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <form method="POST" action="/research/participants/{{ participant.participant_id }}/status" class="flex gap-2 items-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="flex-1">
+                    <label class="label" for="new_status">เปลี่ยนสถานะ</label>
+                    <select class="input" id="new_status" name="status">
+                        {% for key, label in statuses.items() %}
+                        {% if key != 'withdrawn' %}
+                        <option value="{{ key }}" {% if participant.status == key %}selected{% endif %}>{{ label }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-secondary">บันทึก</button>
+            </form>
+
+            {% if participant.status != 'withdrawn' %}
+            <form method="POST" action="/research/participants/{{ participant.participant_id }}/status"
+                  class="flex gap-2 items-end"
+                  onsubmit="return confirm('ยืนยันการบันทึกว่าผู้ป่วยถอนตัวจากการศึกษา?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="status" value="withdrawn">
+                <div class="flex-1">
+                    <label class="label" for="reason">เหตุผลการถอนตัว</label>
+                    <select class="input" id="reason" name="reason" required>
+                        <option value="">— เลือกเหตุผล —</option>
+                        {% for reason in withdrawal_reasons %}<option value="{{ reason }}">{{ reason }}</option>{% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-danger">บันทึกการถอนตัว</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

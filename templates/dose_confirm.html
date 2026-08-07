@@ -7,7 +7,7 @@
         <div style="width:42px; height:42px; border-radius:50%; background:#DBEAFE; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">👤</div>
         <div>
             <div style="font-size:15px; font-weight:700;">{{ token.full_name }}</div>
-            <div style="font-size:12px; color:#8A9BAA;">HN {{ token.hn or '-' }} · {{ token.scheduled_date | thai_date }}</div>
+            <div class="muted" style="font-size:12px;">HN {{ token.hn or '-' }} · {{ token.scheduled_date | thai_date }}</div>
         </div>
     </div>
 
@@ -29,13 +29,13 @@
 
     {% else %}
     <div style="background:#0B1F36; padding:24px 22px;">
-        <div style="font-size:11px; color:#7E97AF; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px;">โดสของวันนี้</div>
+        <div class="muted" style="font-size:11px; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px;">โดสของวันนี้</div>
         <div>
             <span style="font-size:44px; font-weight:800; color:#fff; letter-spacing:-.02em; line-height:1;">{{ token.warfarin_mg }}</span>
-            <span style="font-size:18px; color:#94A3B8; margin-left:4px;">mg</span>
+            <span class="muted" style="font-size:18px; margin-left:4px;">mg</span>
         </div>
-        <div style="font-size:13px; color:#94A3B8; margin-top:4px;">{{ token.pill_description or 'ยาวาร์ฟาริน' }}</div>
-        <div style="font-size:12px; color:#64748B; margin-top:2px;">เวลา {{ token.scheduled_time }} น.</div>
+        <div class="muted" style="font-size:13px; margin-top:4px;">{{ token.pill_description or 'ยาวาร์ฟาริน' }}</div>
+        <div class="muted" style="font-size:12px; margin-top:2px;">เวลา {{ token.scheduled_time }} น.</div>
     </div>
 
     <div class="card-pad">
@@ -46,9 +46,9 @@
         </div>
         {% endif %}
 
-        <p style="font-size:13px; color:#64748B; margin-bottom:14px; line-height:1.6;">{{ adh_msg }}</p>
+        <p class="muted" style="font-size:13px; margin-bottom:14px; line-height:1.6;">{{ adh_msg }}</p>
 
-        <form method="POST" action="/dose/{{ token.token_id }}/confirm">
+        <form method="POST" action="/dose/{{ token.token_id }}/confirm" data-confirm-dose>
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="field">
                 <label for="confirm_source">ใครเป็นผู้ยืนยัน</label>

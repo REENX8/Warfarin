@@ -86,3 +86,71 @@ body {
 
 /* Severity picker on the symptom form. */
 .sev-input:checked + .sev-box { background: #E11D48; border-color: #E11D48; color: #fff; }
+
+/* ---------------------------------------------------------------------------
+ * Elderly-friendly controls
+ *
+ * Text scale is a CSS variable so one control resizes the whole page without
+ * reflowing the layout into a different design.
+ * ------------------------------------------------------------------------- */
+:root { --text-scale: 1; }
+
+.shell { font-size: calc(1rem * var(--text-scale)); }
+.shell .row { font-size: calc(13px * var(--text-scale)); }
+.shell .section-title { font-size: calc(12px * var(--text-scale)); }
+.shell .btn { font-size: calc(15px * var(--text-scale)); padding: calc(14px * var(--text-scale)) 14px; }
+.shell .btn-ghost { font-size: calc(13px * var(--text-scale)); }
+.shell .notice { font-size: calc(13px * var(--text-scale)); }
+.shell .field label { font-size: calc(13px * var(--text-scale)); }
+.shell .field input, .shell .field textarea, .shell .field select {
+    font-size: calc(14px * var(--text-scale));
+    min-height: 46px;   /* comfortable tap target */
+}
+
+.a11y-bar {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+.a11y-button {
+    font-family: inherit; font-size: 12px; font-weight: 600;
+    padding: 8px 14px; border-radius: 20px; cursor: pointer;
+    background: #fff; border: 1px solid #CBD5E1; color: #4B5E6D;
+    min-height: 40px;
+}
+.a11y-button:hover { background: #F0F4F8; }
+.a11y-button:focus-visible { outline: 3px solid #0284C7; outline-offset: 2px; }
+
+/* Checkbox rows on the symptom form need a large, obvious hit area. */
+.shell input[type="checkbox"], .shell input[type="radio"] {
+    min-width: 22px; min-height: 22px;
+}
+
+/* Muted secondary text. Set as a class rather than an inline colour so the
+ * high-contrast override below can actually win. */
+.muted { color: #64748B; }
+.shell .muted { font-size: calc(12px * var(--text-scale)); }
+
+/* High-contrast mode: stronger borders and darker text throughout. */
+.high-contrast .muted { color: #1F2937; }
+.high-contrast .pill-default { background: #E5E7EB; color: #111827; border: 1px solid #4B5563; }
+.high-contrast .section-title { color: #1F2937; }
+.high-contrast .v, .high-contrast strong { color: #000; }
+.high-contrast body { background: #fff; color: #000; }
+.high-contrast .card { border: 2px solid #000; box-shadow: none; }
+.high-contrast .row { border-bottom-color: #94A3B8; }
+.high-contrast .row .k { color: #1F2937; }
+.high-contrast .foot, .high-contrast .brand p { color: #374151; }
+.high-contrast .notice { border-width: 2px; }
+.high-contrast .notice-danger  { background: #fff; border-color: #B91C1C; color: #7F1D1D; }
+.high-contrast .notice-warning { background: #fff; border-color: #B45309; color: #78350F; }
+.high-contrast .notice-success { background: #fff; border-color: #047857; color: #064E3B; }
+.high-contrast .notice-info    { background: #fff; border-color: #0369A1; color: #0C4A6E; }
+.high-contrast .btn-primary { background: #047857; }
+.high-contrast .btn-ghost { border: 2px solid #000; color: #000; }
+.high-contrast .a11y-button { border: 2px solid #000; color: #000; }
+.high-contrast .pill-success { background: #ECFDF5; color: #064E3B; border: 1px solid #047857; }
+.high-contrast .pill-danger  { background: #FEF2F2; color: #7F1D1D; border: 1px solid #B91C1C; }
+
+@media print {
+    .a11y-bar { display: none !important; }
+}

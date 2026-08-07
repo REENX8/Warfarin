@@ -7,6 +7,7 @@
     <title>{% block title %}ระบบวาร์ฟาริน{% endblock %} | {{ hospital_name }}</title>
     <link rel="stylesheet" href="/static/css/app.css">
     <link rel="stylesheet" href="/static/css/public.css">
+    <script src="/static/js/patient.js"></script>
     {% block head_extra %}{% endblock %}
 </head>
 <body>
@@ -23,7 +24,11 @@
         </div>
     </div>
 
-    {% block content %}{% endblock %}
+    <div class="a11y-bar" id="a11yControls" role="group" aria-label="ปรับการแสดงผล"></div>
+
+    <main id="mainContent">
+        {% block content %}{% endblock %}
+    </main>
 
     <p class="foot">
         ระบบติดตามการกินยาวาร์ฟาริน · {{ hospital_name }}

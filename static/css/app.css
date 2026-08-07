@@ -345,3 +345,125 @@ h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
     .card, .stat-card { box-shadow: none; border-color: #CBD5E1; break-inside: avoid; }
     a { text-decoration: none; color: inherit; }
 }
+
+/* ---------------------------------------------------------------------------
+ * Accessibility
+ * ------------------------------------------------------------------------- */
+.skip-link {
+    position: absolute; left: -9999px; top: 0; z-index: 100;
+    background: #0B1F36; color: #fff; padding: 12px 18px;
+    border-radius: 0 0 8px 0; font-size: 14px; font-weight: 600;
+}
+.skip-link:focus { left: 0; }
+
+/* Visible focus everywhere — a keyboard user must always know where they are. */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+    outline: 3px solid #0284C7;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .001ms !important;
+        transition-duration: .001ms !important;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+ * Toasts
+ * ------------------------------------------------------------------------- */
+.toast-host {
+    position: fixed; top: 16px; right: 16px; z-index: 90;
+    display: flex; flex-direction: column; gap: 10px;
+    max-width: min(420px, calc(100vw - 32px));
+}
+.toast {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 13px 15px; border-radius: 12px; font-size: 13.5px; line-height: 1.6;
+    box-shadow: 0 10px 30px rgba(15, 27, 40, .16);
+    background: #fff; border: 1px solid #E2E8F0; color: #0F1923;
+    transform: translateX(12px); opacity: 0; transition: transform .2s ease, opacity .2s ease;
+}
+.toast.is-visible { transform: translateX(0); opacity: 1; }
+.toast-text { flex: 1; }
+.toast-close {
+    font-size: 18px; line-height: 1; color: inherit; opacity: .55;
+    padding: 0 2px; flex-shrink: 0;
+}
+.toast-close:hover { opacity: 1; }
+.toast-success { border-left: 5px solid #059669; }
+.toast-warning { border-left: 5px solid #D97706; }
+.toast-danger  { border-left: 5px solid #DC2626; }
+.toast-info    { border-left: 5px solid #0284C7; }
+
+/* ---------------------------------------------------------------------------
+ * Command palette
+ * ------------------------------------------------------------------------- */
+.palette { position: fixed; inset: 0; z-index: 95; }
+.palette[hidden] { display: none; }
+.palette-backdrop { position: absolute; inset: 0; background: rgba(11, 31, 54, .45); }
+.palette-panel {
+    position: relative; margin: 10vh auto 0; width: min(560px, calc(100vw - 32px));
+    background: #fff; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 24px 60px rgba(15, 27, 40, .3);
+}
+.palette-input {
+    width: 100%; padding: 17px 20px; border: none; font-size: 15px;
+    border-bottom: 1px solid #E2E8F0; background: #fff; color: #0F1923;
+}
+.palette-input:focus { outline: none; }
+.palette-list { list-style: none; max-height: 52vh; overflow-y: auto; }
+.palette-item {
+    display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
+    padding: 12px 20px; cursor: pointer; font-size: 14px;
+}
+.palette-item.is-active { background: #EFF8FF; }
+.palette-label { font-weight: 600; }
+.palette-hint { font-size: 12px; color: #8A9BAA; text-align: right; }
+.palette-empty { padding: 22px 20px; text-align: center; color: #8A9BAA; font-size: 13px; }
+.palette-foot {
+    padding: 9px 20px; font-size: 11px; color: #8A9BAA;
+    background: #FAFBFC; border-top: 1px solid #E2E8F0;
+}
+
+.search-trigger {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 8px 11px; border-radius: 8px; font-size: 12.5px;
+    background: rgba(255, 255, 255, .06); color: #7E97AF; text-align: left;
+}
+.search-trigger:hover { background: rgba(255, 255, 255, .1); color: #CBD5E1; }
+.search-trigger kbd {
+    margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 4px;
+    background: rgba(255, 255, 255, .1); font-family: inherit;
+}
+
+.shortcut-help {
+    position: fixed; right: 20px; bottom: 20px; z-index: 92;
+    background: #fff; border: 1px solid #E2E8F0; border-radius: 12px;
+    padding: 16px 18px; box-shadow: 0 16px 40px rgba(15, 27, 40, .18);
+    font-size: 13px; min-width: 260px;
+}
+.shortcut-title { font-weight: 700; margin-bottom: 10px; }
+.shortcut-row { display: flex; gap: 12px; align-items: center; padding: 4px 0; }
+.shortcut-row kbd {
+    font-family: inherit; font-size: 11px; padding: 3px 8px; border-radius: 5px;
+    background: #F1F5F9; border: 1px solid #E2E8F0; white-space: nowrap; min-width: 96px;
+    text-align: center;
+}
+.shortcut-row span { color: #4B5E6D; }
+
+/* A horizontally scrollable table should look scrollable. */
+.overflow-x-auto.has-overflow {
+    background:
+        linear-gradient(to right, #fff 30%, rgba(255, 255, 255, 0)) left / 40px 100% no-repeat,
+        linear-gradient(to left, #fff 30%, rgba(255, 255, 255, 0)) right / 40px 100% no-repeat,
+        linear-gradient(to right, rgba(15, 27, 40, .08), rgba(255, 255, 255, 0)) left / 14px 100% no-repeat,
+        linear-gradient(to left, rgba(15, 27, 40, .08), rgba(255, 255, 255, 0)) right / 14px 100% no-repeat;
+    background-attachment: local, local, scroll, scroll;
+}
+
+@media print {
+    .toast-host, .palette, .shortcut-help, .search-trigger, .skip-link { display: none !important; }
+}

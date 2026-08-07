@@ -148,6 +148,7 @@ def create_app(settings_override: bool = False) -> FastAPI:
         public,
         qr,
         reports,
+        research,
         symptoms,
     )
 
@@ -156,6 +157,7 @@ def create_app(settings_override: bool = False) -> FastAPI:
         dashboard.router,
         patients.router,
         reports.router,
+        research.router,
         symptoms.router,
         admin.router,
         api.router,

@@ -30,6 +30,11 @@
             <a href="/patients/{{ patient.patient_id }}/survey" class="btn btn-secondary btn-sm">📋 แบบสอบถาม</a>
             {% if can_edit %}
             <a href="/patients/{{ patient.patient_id }}/edit" class="btn btn-secondary btn-sm">✏️ แก้ไข</a>
+            {% if user.role in ('admin', 'pharmacist') %}
+            <a href="/research/enroll/{{ patient.patient_id }}" class="btn btn-secondary btn-sm">
+                {{ '🔬 แก้ไขข้อมูลวิจัย' if participant else '🔬 เพิ่มเข้างานวิจัย' }}
+            </a>
+            {% endif %}
             {% if patient.active %}
             <form method="POST" action="/patients/{{ patient.patient_id }}/deactivate" onsubmit="return confirm('ยืนยันการปิดบัญชีผู้ป่วยรายนี้? การแจ้งเตือนทั้งหมดจะหยุดลง');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -44,6 +49,17 @@
             {% endif %}
         </div>
     </div>
+
+    {% if participant %}
+    <div class="flash flash-info">
+        <div>
+            อยู่ในงานวิจัย <strong>{{ participant.study_code }}</strong> ·
+            {{ research_arms[participant.arm] }} · {{ research_statuses[participant.status] }} —
+            <a href="/research/participants/{{ participant.participant_id }}"
+               style="color:#075985; text-decoration:underline;">ดูข้อมูลวิจัย</a>
+        </div>
+    </div>
+    {% endif %}
 
     {% if assessment and assessment.urgency >= 1 %}
     <div class="flash flash-{{ 'danger' if assessment.urgency >= 2 else 'warning' }}">

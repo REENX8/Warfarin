@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}ผู้เข้าร่วมวิจัย{% endblock %}
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+            <h1 class="text-[22px] font-bold tracking-tight">ผู้เข้าร่วมวิจัย</h1>
+            <p class="text-[13px] mt-1" style="color:#8A9BAA;">{{ participants|length }} ราย</p>
+        </div>
+        <div class="flex gap-2 no-print">
+            <a href="/patients" class="btn btn-secondary">+ เพิ่มจากรายชื่อผู้ป่วย</a>
+            <a href="/research/analysis" class="btn btn-primary">วิเคราะห์ผล</a>
+        </div>
+    </div>
+
+    <form method="GET" action="/research/participants" class="flex gap-2 items-end flex-wrap no-print">
+        <div style="width:200px;">
+            <label class="label" for="arm">กลุ่มศึกษา</label>
+            <select class="input" id="arm" name="arm" onchange="this.form.submit()">
+                <option value="">ทุกกลุ่ม</option>
+                {% for key, label in arms.items() %}
+                <option value="{{ key }}" {% if arm == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="width:200px;">
+            <label class="label" for="status">สถานะ</label>
+            <select class="input" id="status" name="status" onchange="this.form.submit()">
+                <option value="">ทุกสถานะ</option>
+                {% for key, label in statuses.items() %}
+                <option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% if study_codes|length > 1 %}
+        <div style="width:200px;">
+            <label class="label" for="study">โครงการ</label>
+            <select class="input" id="study" name="study" onchange="this.form.submit()">
+                <option value="">ทุกโครงการ</option>
+                {% for code in study_codes %}
+                <option value="{{ code }}" {% if study == code %}selected{% endif %}>{{ code }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        {% if arm or status or study %}
+        <a href="/research/participants" class="btn btn-ghost">ล้างตัวกรอง</a>
+        {% endif %}
+    </form>
+
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ผู้เข้าร่วม</th>
+                        <th>กลุ่ม</th>
+                        <th class="text-center">สถานะ</th>
+                        <th class="hidden sm:table-cell">ช่วง Baseline</th>
+                        <th class="hidden sm:table-cell">ช่วง Endline</th>
+                        <th class="text-center">ข้อมูลที่เก็บ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in participants %}
+                    <tr>
+                        <td>
+                            <a href="/research/participants/{{ row.participant_id }}"
+                               class="font-semibold hover:underline" style="color:#0284C7;">{{ row.full_name }}</a>
+                            <div class="text-[11px]" style="color:#8A9BAA;">HN {{ row.hn or '-' }} · รหัส {{ row.study_code }}</div>
+                        </td>
+                        <td><span class="badge {{ 'badge-primary' if row.arm == 'intervention' else 'badge-default' }}">{{ arms[row.arm] }}</span></td>
+                        <td class="text-center">
+                            <span class="badge {% if row.status == 'withdrawn' %}badge-danger{% elif row.status == 'completed' %}badge-success{% elif row.status == 'enrolled' %}badge-primary{% else %}badge-default{% endif %}">
+                                {{ statuses[row.status] }}
+                            </span>
+                        </td>
+                        <td class="hidden sm:table-cell text-[12px]" style="color:#4B5E6D;">
+                            {{ row.baseline_start | thai_date }} – {{ row.baseline_end | thai_date }}
+                        </td>
+                        <td class="hidden sm:table-cell text-[12px]" style="color:#4B5E6D;">
+                            {{ row.endline_start | thai_date }} – {{ row.endline_end | thai_date }}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge {% if row.scores_recorded == total_slots %}badge-success{% elif row.scores_recorded %}badge-warning{% else %}badge-default{% endif %}">
+                                {{ row.scores_recorded }}/{{ total_slots }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center py-16" style="color:#8A9BAA;">
+                        ยังไม่มีผู้เข้าร่วมวิจัย — เปิดหน้าข้อมูลผู้ป่วยแล้วกด "เพิ่มเข้างานวิจัย"
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

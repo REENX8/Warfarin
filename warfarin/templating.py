@@ -17,6 +17,9 @@ from warfarin.clinical import (
     SYMPTOM_STATUS_LABELS,
 )
 from warfarin.config import get_settings
+from warfarin.research import ARMS as RESEARCH_ARMS
+from warfarin.research import PHASES as RESEARCH_PHASES
+from warfarin.research import STATUSES as RESEARCH_STATUSES
 from warfarin.security import ROLES
 from warfarin.time_utils import (
     THAI_MONTHS,
@@ -79,6 +82,16 @@ def _open_symptom_count() -> int:
         return 0
 
 
+def _enrolled_count() -> int:
+    """Sidebar badge for the research cohort."""
+    try:
+        from warfarin.research import enrolled_count
+
+        return enrolled_count()
+    except Exception:  # pragma: no cover - defensive
+        return 0
+
+
 def get_templates() -> Jinja2Templates:
     """Build (once) the Jinja environment used by every route."""
     global _templates
@@ -109,6 +122,9 @@ def get_templates() -> Jinja2Templates:
         symptom_status_labels=SYMPTOM_STATUS_LABELS,
         dose_status_labels=DOSE_STATUS_LABELS,
         status_badges=STATUS_BADGES,
+        research_arms=RESEARCH_ARMS,
+        research_statuses=RESEARCH_STATUSES,
+        research_phases=RESEARCH_PHASES,
         thai_months=THAI_MONTHS,
         thai_months_short=THAI_MONTHS_SHORT,
         today=today,
@@ -149,6 +165,7 @@ def render(
     data.setdefault("flash_kind", request.query_params.get("kind", "success"))
     if data.get("user") is not None:
         data.setdefault("open_symptom_count", _open_symptom_count())
+        data.setdefault("enrolled_count", _enrolled_count())
     return get_templates().TemplateResponse(
         request, template, data, status_code=status_code
     )

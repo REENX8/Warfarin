@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}วิเคราะห์ผลงานวิจัย{% endblock %}
+{% block content %}
+<div class="space-y-5">
+
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+            <h1 class="text-[22px] font-bold tracking-tight">ผลการวิเคราะห์</h1>
+            <p class="text-[13px] mt-1" style="color:#8A9BAA;">
+                วิเคราะห์จากผู้เข้าร่วม {{ n_analysed }} ราย (สถานะเข้าร่วมแล้วหรือสิ้นสุดการติดตาม)
+            </p>
+        </div>
+        <div class="flex gap-2 flex-wrap no-print">
+            <a href="/research/export.csv{% if study %}?study={{ study }}{% endif %}" class="btn btn-secondary">⬇️ CSV</a>
+            <a href="/research/export.xlsx{% if study %}?study={{ study }}{% endif %}" class="btn btn-secondary">⬇️ Excel</a>
+            <a href="/research/codebook.csv" class="btn btn-secondary">⬇️ Codebook</a>
+            <button onclick="window.print()" class="btn btn-secondary">🖨️ พิมพ์</button>
+        </div>
+    </div>
+
+    <div class="flash flash-info no-print">
+        <div>
+            ไฟล์ที่ดาวน์โหลดเป็นแบบ <strong>ไม่ระบุตัวตน</strong> โดยค่าเริ่มต้น (ไม่มี HN และชื่อ)
+            {% if user.role == 'admin' %}
+            — ผู้ดูแลระบบสามารถ<a href="/research/export.csv?identified=1{% if study %}&study={{ study }}{% endif %}"
+               style="color:#075985; text-decoration:underline;">ดาวน์โหลดแบบระบุตัวตน</a>ได้เมื่อจำเป็นต้องตรวจสอบข้อมูลย้อนกลับ
+            {% endif %}
+        </div>
+    </div>
+
+    {% if n_analysed == 0 %}
+    <div class="card text-center py-16" style="color:#8A9BAA;">
+        ยังไม่มีผู้เข้าร่วมที่นำมาวิเคราะห์ได้ — เพิ่มผู้ป่วยเข้างานวิจัยก่อน
+    </div>
+    {% else %}
+
+    <!-- Table 1 -->
+    <div class="card overflow-hidden">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold">ตารางที่ 1 — ลักษณะพื้นฐานของผู้เข้าร่วม</div>
+                <div class="text-xs" style="color:#8A9BAA;">
+                    ค่าต่อเนื่องรายงานเป็น mean ± SD · ค่าจัดกลุ่มรายงานเป็นจำนวน (ร้อยละ)
+                </div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ลักษณะ</th>
+                        <th class="text-center">ทั้งหมด (n={{ table_one.n_total }})</th>
+                        <th class="text-center">กลุ่มทดลอง (n={{ table_one.n_intervention }})</th>
+                        {% if table_one.has_control %}
+                        <th class="text-center">กลุ่มควบคุม (n={{ table_one.n_control }})</th>
+                        <th class="text-center">p-value</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in table_one.continuous %}
+                    <tr>
+                        <td class="font-semibold">{{ row.label }}</td>
+                        <td class="text-center">{{ row.all.summary() }}</td>
+                        <td class="text-center">{{ row.intervention.summary() }}</td>
+                        {% if table_one.has_control %}
+                        <td class="text-center">{{ row.control.summary() }}</td>
+                        <td class="text-center">{{ row.test.p_text() if row.test else '-' }}</td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+
+                    {% for group in table_one.categorical %}
+                    <tr style="background:#FAFBFC;">
+                        <td class="font-semibold" colspan="{{ 5 if table_one.has_control else 3 }}">{{ group.label }}</td>
+                    </tr>
+                    {% for level in group.levels %}
+                    <tr>
+                        <td style="padding-left:32px; color:#4B5E6D;">{{ level.label }}</td>
+                        <td class="text-center">{{ level.all }} ({{ level.all_percent }}%)</td>
+                        <td class="text-center">{{ level.intervention }}</td>
+                        {% if table_one.has_control %}
+                        <td class="text-center">{{ level.control }}</td>
+                        <td class="text-center">{% if loop.first %}{{ group.test.p_text() if group.test else '-' }}{% endif %}</td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Primary within-group analysis -->
+    <div class="card overflow-hidden">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold">ตารางที่ 2 — เปรียบเทียบก่อนและหลังใช้ระบบ ({{ within_label }})</div>
+                <div class="text-xs" style="color:#8A9BAA;">Paired t-test · แสดง Wilcoxon signed-rank เป็นค่าเปรียบเทียบแบบ non-parametric</div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ตัวชี้วัด</th>
+                        <th class="text-center">n (คู่)</th>
+                        <th class="text-center">Baseline</th>
+                        <th class="text-center">Endline</th>
+                        <th class="text-center">ผลต่างเฉลี่ย (95% CI)</th>
+                        <th class="text-center">t (df)</th>
+                        <th class="text-center">p-value</th>
+                        <th class="text-center hidden lg:table-cell">Effect size</th>
+                        <th class="text-center hidden lg:table-cell">Wilcoxon p</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in within %}
+                    <tr>
+                        <td class="font-semibold">{{ row.label }}</td>
+                        <td class="text-center">{{ row.test.n }}</td>
+                        <td class="text-center">{{ row.baseline.summary() }}</td>
+                        <td class="text-center">{{ row.endline.summary() }}</td>
+                        <td class="text-center">
+                            {% if row.test.extra.get('mean_difference') is not none %}
+                            {{ '%.2f'|format(row.test.extra['mean_difference']) }}
+                            <div class="text-[11px]" style="color:#8A9BAA;">
+                                ({{ '%.2f'|format(row.test.extra['ci_low']) }} ถึง {{ '%.2f'|format(row.test.extra['ci_high']) }})
+                            </div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if row.test.statistic is not none %}
+                            {{ '%.3f'|format(row.test.statistic) }}
+                            <div class="text-[11px]" style="color:#8A9BAA;">({{ row.test.df }})</div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="{% if row.test.significant %}font-bold{% endif %}"
+                                  style="color:{{ '#059669' if row.test.significant else '#4B5E6D' }};">
+                                {{ row.test.p_text() }}
+                            </span>
+                        </td>
+                        <td class="text-center hidden lg:table-cell">
+                            {% if row.test.effect_size is not none %}
+                            {{ '%.2f'|format(row.test.effect_size) }}
+                            <div class="text-[11px]" style="color:#8A9BAA;">{{ row.test.effect_label }}</div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-center hidden lg:table-cell">{{ row.nonparametric.p_text() }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="p-4 text-[12px]" style="border-top:1px solid #E2E8F0; color:#8A9BAA;">
+            แถวที่ n น้อยหรือแสดง "—" หมายถึงข้อมูลไม่พอสำหรับการทดสอบ ไม่ได้แปลว่าไม่มีความแตกต่าง
+        </div>
+    </div>
+
+    <!-- Binary outcomes -->
+    <div class="card overflow-hidden">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold">ตารางที่ 3 — สัดส่วนผู้ที่ผ่านเกณฑ์ทางคลินิก</div>
+                <div class="text-xs" style="color:#8A9BAA;">McNemar's test · ร้อยละพร้อมช่วงเชื่อมั่น 95% (Wilson)</div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>เกณฑ์</th>
+                        <th class="text-center">Baseline</th>
+                        <th class="text-center">Endline</th>
+                        <th class="text-center">เปลี่ยนแปลง</th>
+                        <th class="text-center">p-value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in binary %}
+                    <tr>
+                        <td class="font-semibold">{{ row.label }}</td>
+                        <td class="text-center">
+                            {% if row.baseline_n %}
+                            {{ '%.1f'|format(row.baseline[0]) }}%
+                            <div class="text-[11px]" style="color:#8A9BAA;">
+                                ({{ '%.1f'|format(row.baseline[1]) }}–{{ '%.1f'|format(row.baseline[2]) }}) · n={{ row.baseline_n }}
+                            </div>
+                            {% else %}
+                            <span style="color:#CBD5E1;">ไม่มีข้อมูล</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if row.endline_n %}
+                            {{ '%.1f'|format(row.endline[0]) }}%
+                            <div class="text-[11px]" style="color:#8A9BAA;">
+                                ({{ '%.1f'|format(row.endline[1]) }}–{{ '%.1f'|format(row.endline[2]) }}) · n={{ row.endline_n }}
+                            </div>
+                            {% else %}
+                            <span style="color:#CBD5E1;">ไม่มีข้อมูล</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center text-[12px]" style="color:#4B5E6D;">{{ row.test.detail or '—' }}</td>
+                        <td class="text-center">
+                            <span class="{% if row.test.significant %}font-bold{% endif %}"
+                                  style="color:{{ '#059669' if row.test.significant else '#4B5E6D' }};">
+                                {{ row.test.p_text() }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Between-group -->
+    {% if between %}
+    <div class="card overflow-hidden">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold">ตารางที่ 4 — เปรียบเทียบระหว่างกลุ่มที่ Endline</div>
+                <div class="text-xs" style="color:#8A9BAA;">Welch's t-test (ไม่ต้องสมมติว่าความแปรปรวนเท่ากัน)</div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ตัวชี้วัด</th>
+                        <th class="text-center">กลุ่มทดลอง</th>
+                        <th class="text-center">กลุ่มควบคุม</th>
+                        <th class="text-center">ผลต่าง</th>
+                        <th class="text-center">p-value</th>
+                        <th class="text-center hidden lg:table-cell">Effect size</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in between %}
+                    <tr>
+                        <td class="font-semibold">{{ row.label }}</td>
+                        <td class="text-center">{{ row.intervention.summary() }}<div class="text-[11px]" style="color:#8A9BAA;">n={{ row.intervention.n }}</div></td>
+                        <td class="text-center">{{ row.control.summary() }}<div class="text-[11px]" style="color:#8A9BAA;">n={{ row.control.n }}</div></td>
+                        <td class="text-center text-[12px]" style="color:#4B5E6D;">{{ row.test.detail or '—' }}</td>
+                        <td class="text-center">
+                            <span class="{% if row.test.significant %}font-bold{% endif %}"
+                                  style="color:{{ '#059669' if row.test.significant else '#4B5E6D' }};">
+                                {{ row.test.p_text() }}
+                            </span>
+                        </td>
+                        <td class="text-center hidden lg:table-cell">
+                            {% if row.test.effect_size is not none %}{{ '%.2f'|format(row.test.effect_size) }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card p-5 text-[13px]" style="color:#8A9BAA;">
+        ยังไม่มีการเปรียบเทียบระหว่างกลุ่ม เพราะมีผู้เข้าร่วมเพียงกลุ่มเดียว —
+        เพิ่มผู้ป่วยในกลุ่มควบคุมเพื่อให้ระบบวิเคราะห์เปรียบเทียบระหว่างกลุ่มให้อัตโนมัติ
+    </div>
+    {% endif %}
+
+    <div class="card p-5 text-[12px]" style="color:#64748B; line-height:1.9;">
+        <strong style="color:#0F1923;">หมายเหตุเชิงสถิติ</strong><br>
+        • ความสม่ำเสมอและ TTR คำนวณจากข้อมูลจริงในช่วง Baseline และ Endline ที่กำหนดไว้ของผู้เข้าร่วมแต่ละราย<br>
+        • TTR ใช้วิธี Rosendaal (linear interpolation) ต้องมีผล INR อย่างน้อย 2 ครั้งในช่วงนั้น<br>
+        • เกณฑ์ที่ใช้: ความสม่ำเสมอ ≥ {{ '%.0f'|format(adherence_target) }}% และ TTR ≥ {{ '%.0f'|format(ttr_target) }}%<br>
+        • การวิเคราะห์นี้เป็นการสรุปเบื้องต้นเพื่อการติดตามงาน ควรตรวจสอบสมมติฐานของสถิติ
+        (การแจกแจง ค่าผิดปกติ ข้อมูลขาดหาย) ก่อนนำไปตีพิมพ์
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

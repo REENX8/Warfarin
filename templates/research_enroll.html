@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}เพิ่มเข้างานวิจัย{% endblock %}
+{% block content %}
+{% set value = form or participant or {} %}
+<div class="space-y-5" style="max-width:720px;">
+    <a href="/patients/{{ patient.patient_id }}" class="text-[13px] font-medium" style="color:#0284C7;">← กลับข้อมูลผู้ป่วย</a>
+
+    <div>
+        <h1 class="text-[22px] font-bold tracking-tight">
+            {{ 'แก้ไขข้อมูลการเข้าร่วมวิจัย' if participant else 'เพิ่มผู้ป่วยเข้างานวิจัย' }}
+        </h1>
+        <p class="text-[13px] mt-1" style="color:#8A9BAA;">{{ patient.full_name }} · HN {{ patient.hn or '-' }}</p>
+    </div>
+
+    {% if error %}<div class="flash flash-danger"><div>{{ error }}</div></div>{% endif %}
+
+    <div class="flash flash-info">
+        <div>
+            ต้องได้รับความยินยอมเป็นลายลักษณ์อักษรจากผู้ป่วยก่อนบันทึกสถานะ "เข้าร่วมแล้ว"
+            และเก็บเอกสารยินยอมไว้ตามข้อกำหนดของคณะกรรมการจริยธรรมการวิจัย
+        </div>
+    </div>
+
+    <form method="POST" action="/research/enroll/{{ patient.patient_id }}" class="space-y-5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">การเข้าร่วมและความยินยอม</div></div>
+            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="label" for="study_code">รหัสโครงการวิจัย</label>
+                    <input class="input" id="study_code" name="study_code" list="study_code_options" maxlength="40"
+                           value="{{ value.study_code or default_code }}">
+                    <datalist id="study_code_options">
+                        {% for code in study_codes %}<option value="{{ code }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div>
+                    <label class="label" for="arm">กลุ่มศึกษา <span style="color:#DC2626;">*</span></label>
+                    <select class="input" id="arm" name="arm" required>
+                        {% for key, label in arms.items() %}
+                        <option value="{{ key }}" {% if value.arm == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="label" for="status">สถานะการเข้าร่วม</label>
+                    <select class="input" id="status" name="status">
+                        {% for key, label in statuses.items() %}
+                        <option value="{{ key }}" {% if (value.status or 'enrolled') == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="label" for="consent_date">วันที่ลงนามยินยอม</label>
+                    <input type="date" class="input" id="consent_date" name="consent_date" max="{{ today }}"
+                           value="{{ value.consent_date or '' }}">
+                </div>
+                <div>
+                    <label class="label" for="consent_version">เวอร์ชันเอกสารยินยอม</label>
+                    <input class="input" id="consent_version" name="consent_version" maxlength="40"
+                           placeholder="เช่น v1.2 ลงวันที่ 1 ม.ค. 2569"
+                           value="{{ value.consent_version or '' }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="text-sm font-semibold">ช่วงเวลาเก็บข้อมูล</div>
+                    <div class="text-xs" style="color:#8A9BAA;">ระบบคำนวณความสม่ำเสมอและ TTR จากข้อมูลจริงในแต่ละช่วงนี้</div>
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="label" for="baseline_start">วันเริ่ม Baseline <span style="color:#DC2626;">*</span></label>
+                        <input type="date" class="input" id="baseline_start" name="baseline_start" required
+                               value="{{ value.baseline_start or today }}">
+                    </div>
+                    <div>
+                        <label class="label" for="phase_days">ความยาวแต่ละช่วง (วัน)</label>
+                        <input type="number" class="input" id="phase_days" name="phase_days" min="7" max="365"
+                               value="{{ default_phase_days }}">
+                        <div class="text-[11px] mt-1" style="color:#8A9BAA;">เว้นช่องวันที่ด้านล่างไว้ ระบบจะคำนวณให้อัตโนมัติ</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="label" for="baseline_end">สิ้นสุด Baseline</label>
+                        <input type="date" class="input" id="baseline_end" name="baseline_end" value="{{ value.baseline_end or '' }}">
+                    </div>
+                    <div>
+                        <label class="label" for="endline_start">เริ่ม Endline</label>
+                        <input type="date" class="input" id="endline_start" name="endline_start" value="{{ value.endline_start or '' }}">
+                    </div>
+                    <div>
+                        <label class="label" for="endline_end">สิ้นสุด Endline</label>
+                        <input type="date" class="input" id="endline_end" name="endline_end" value="{{ value.endline_end or '' }}">
+                    </div>
+                </div>
+                <div>
+                    <label class="label" for="notes">บันทึกเพิ่มเติม</label>
+                    <textarea class="input" id="notes" name="notes" rows="2" maxlength="1000">{{ value.notes or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary">บันทึก</button>
+            <a href="/patients/{{ patient.patient_id }}" class="btn btn-secondary">ยกเลิก</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from warfarin import appointments as appt
 from warfarin import doses as dose_service
-from warfarin import notifications, symptoms
+from warfarin import notifications, research, symptoms
 from warfarin import patients as patient_service
 from warfarin.adherence import (
     compute_adherence,
@@ -149,6 +149,7 @@ def patient_detail(
         appointment_history = appt.history_for_patient(conn, patient_id)
         adjustments = appt.adjustments_for_patient(conn, patient_id)
         symptom_rows = symptoms.list_reports(patient_id=patient_id, limit=10)
+        participant = research.get_by_patient(conn, patient_id)
 
     latest_lab = labs[0] if labs else None
     assessment = (
@@ -182,6 +183,7 @@ def patient_detail(
         "scores": scores,
         "surveys": surveys,
         "symptoms": symptom_rows,
+        "participant": participant,
         "adh7": adherence7,
         "adh30": adherence30,
         "adh_all": adherence_all,

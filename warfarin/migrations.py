@@ -337,6 +337,53 @@ def m012_caregiver_index(conn: sqlite3.Connection) -> None:
     _add_column(conn, "caregivers", "created_at", "TEXT")
 
 
+def m013_research_study(conn: sqlite3.Connection) -> None:
+    """Research cohort: enrolment, allocation arm, consent and withdrawal."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS study_participants (
+            participant_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER UNIQUE REFERENCES patients(patient_id),
+            study_code TEXT NOT NULL,
+            arm TEXT NOT NULL DEFAULT 'intervention',
+            status TEXT NOT NULL DEFAULT 'enrolled',
+            consent_date TEXT,
+            consent_version TEXT,
+            enrolled_at TEXT,
+            baseline_start TEXT,
+            baseline_end TEXT,
+            endline_start TEXT,
+            endline_end TEXT,
+            withdrawn_at TEXT,
+            withdrawal_reason TEXT,
+            notes TEXT,
+            created_by TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_study_arm ON study_participants(arm, status);
+        CREATE INDEX IF NOT EXISTS idx_study_code ON study_participants(study_code);
+
+        CREATE TABLE IF NOT EXISTS study_measurements (
+            measurement_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            participant_id INTEGER REFERENCES study_participants(participant_id),
+            phase TEXT NOT NULL,
+            instrument TEXT NOT NULL,
+            value REAL,
+            max_value REAL,
+            text_value TEXT,
+            measured_on TEXT,
+            recorded_by TEXT,
+            created_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_measure_participant
+            ON study_measurements(participant_id, instrument, phase);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_measure_unique
+            ON study_measurements(participant_id, phase, instrument);
+        """
+    )
+
+
 MIGRATIONS: list[tuple[int, str, object]] = [
     (1, "baseline_schema", m001_baseline),
     (2, "server_side_sessions", m002_sessions),
@@ -350,6 +397,7 @@ MIGRATIONS: list[tuple[int, str, object]] = [
     (10, "lab_provenance", m010_lab_provenance),
     (11, "dose_confirm_indexes", m011_dose_confirm_index),
     (12, "caregiver_index", m012_caregiver_index),
+    (13, "research_study", m013_research_study),
 ]
 
 LATEST_VERSION = max(v for v, _, _ in MIGRATIONS)

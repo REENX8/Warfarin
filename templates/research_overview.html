@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}งานวิจัย{% endblock %}
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+            <h1 class="text-[22px] font-bold tracking-tight">งานวิจัย</h1>
+            <p class="text-[13px] mt-1" style="color:#8A9BAA;">
+                ติดตามการรับผู้เข้าร่วม การเก็บข้อมูล และผลลัพธ์ของการศึกษา
+            </p>
+        </div>
+        <div class="flex gap-2 flex-wrap no-print">
+            <a href="/research/participants" class="btn btn-secondary">รายชื่อผู้เข้าร่วม</a>
+            <a href="/research/analysis{% if study %}?study={{ study }}{% endif %}" class="btn btn-primary">วิเคราะห์ผล</a>
+        </div>
+    </div>
+
+    {% if study_codes|length > 1 %}
+    <form method="GET" action="/research" class="flex gap-2 items-end no-print">
+        <div style="width:240px;">
+            <label class="label" for="study">โครงการวิจัย</label>
+            <select class="input" id="study" name="study" onchange="this.form.submit()">
+                <option value="">ทุกโครงการ</option>
+                {% for code in study_codes %}
+                <option value="{{ code }}" {% if study == code %}selected{% endif %}>{{ code }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+    {% endif %}
+
+    <!-- CONSORT-style flow -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">คัดกรอง</div>
+            <div class="text-[26px] font-extrabold" style="color:#64748B;">{{ summary.by_status.screening }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">เข้าร่วมแล้ว</div>
+            <div class="text-[26px] font-extrabold" style="color:#0284C7;">{{ summary.by_status.enrolled }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">สิ้นสุดการติดตาม</div>
+            <div class="text-[26px] font-extrabold" style="color:#059669;">{{ summary.by_status.completed }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">ถอนตัว</div>
+            <div class="text-[26px] font-extrabold" style="color:#DC2626;">{{ summary.by_status.withdrawn }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="text-[11px] uppercase tracking-wider mb-2" style="color:#8A9BAA;">คงอยู่ในการศึกษา</div>
+            <div class="text-[26px] font-extrabold" style="color:#7C3AED;">
+                {% if summary.retention_percent is not none %}{{ summary.retention_percent }}%{% else %}—{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">จำนวนตามกลุ่มศึกษา</div></div>
+            <div class="p-5 space-y-3 text-[13px]">
+                {% for key, label in arms.items() %}
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <span style="color:#4B5E6D;">{{ label }}</span>
+                        <strong>{{ summary.by_arm[key] }} ราย</strong>
+                    </div>
+                    <div style="height:8px; border-radius:4px; background:#F1F5F9; overflow:hidden;">
+                        <div style="height:100%; border-radius:4px;
+                                    width:{{ (summary.by_arm[key] / summary.analysed * 100) if summary.analysed else 0 }}%;
+                                    background:{{ '#0284C7' if key == 'intervention' else '#94A3B8' }};"></div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not summary.by_arm.control %}
+                <p class="text-[12px] pt-2" style="color:#8A9BAA; border-top:1px solid #F1F5F9;">
+                    ยังไม่มีกลุ่มควบคุม — ระบบจะวิเคราะห์แบบเปรียบเทียบก่อน/หลังภายในกลุ่มเดียว
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">ความคืบหน้าการเก็บข้อมูล</div></div>
+            <div class="p-5 space-y-2 text-[13px]">
+                <div class="flex justify-between"><span style="color:#8A9BAA;">ยังไม่ถึงช่วงเก็บข้อมูล</span><strong>{{ progress.not_started }}</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">อยู่ระหว่างติดตาม</span><strong>{{ progress.ongoing }}</strong></div>
+                <div class="flex justify-between"><span style="color:#8A9BAA;">ครบกำหนดแล้ว</span><strong>{{ progress.finished }}</strong></div>
+                <div class="flex justify-between pt-2" style="border-top:1px solid #F1F5F9;">
+                    <span style="color:#8A9BAA;">รวมที่นำมาวิเคราะห์</span><strong>{{ summary.analysed }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><div class="text-sm font-semibold">เหตุผลการถอนตัว</div></div>
+            <div class="p-5 text-[13px]">
+                {% for reason, count in summary.withdrawal_reasons.items() %}
+                <div class="flex justify-between py-1"><span style="color:#4B5E6D;">{{ reason }}</span><strong>{{ count }}</strong></div>
+                {% else %}
+                <p style="color:#8A9BAA;">ยังไม่มีผู้ถอนตัว</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <div class="text-sm font-semibold">รายการที่ยังเก็บข้อมูลไม่ครบ</div>
+                <div class="text-xs" style="color:#8A9BAA;">{{ gap_count }} ราย</div>
+            </div>
+            <a href="/research/participants" class="text-xs font-medium no-print" style="color:#0284C7;">ดูทั้งหมด →</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead><tr><th>ผู้เข้าร่วม</th><th>กลุ่ม</th><th>ข้อมูลที่ยังขาด</th></tr></thead>
+                <tbody>
+                    {% for gap in gaps %}
+                    <tr>
+                        <td>
+                            <a href="/research/participants/{{ gap.participant.participant_id }}"
+                               class="font-semibold hover:underline" style="color:#0284C7;">{{ gap.participant.full_name }}</a>
+                            <div class="text-[11px]" style="color:#8A9BAA;">HN {{ gap.participant.hn or '-' }}</div>
+                        </td>
+                        <td><span class="badge {{ 'badge-primary' if gap.participant.arm == 'intervention' else 'badge-default' }}">{{ arms[gap.participant.arm] }}</span></td>
+                        <td class="text-[12px]" style="color:#4B5E6D;">{{ gap.missing | join(' · ') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="text-center py-12" style="color:#8A9BAA;">เก็บข้อมูลครบทุกรายแล้ว 🎉</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
